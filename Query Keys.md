@@ -26,7 +26,7 @@ because their order is non-deterministic and can lead to unstable hashes.
 A **simple query key** is usually a single constant or string literal.
 It's ideal when your query always fetches the same dataset, independent of parameters.
 
-```
+```csharp
 // A global list of todos
 var key = new QueryKey("todos");
 
@@ -47,7 +47,7 @@ use a **composite query key**.
 Each part contributes to the unique identity of the cached result. 
 It's similar to how a function's arguments define its output. 
 
-```
+```csharp
 // A single todo by ID
 var key = new QueryKey("todo", 5);
 
@@ -67,7 +67,7 @@ Equality in `QueryKey` is value-based, not reference-based.
 
 The following are equal, even though the anonymous properties are declared in different orders: 
 
-```
+```csharp
 new QueryKey("todos", new { status = "active", page = 2 });
 new QueryKey("todos", new { page = 2, status = "active" });
 new QueryKey("todos", new { page = 2, status = "active", other = (string?)null });
@@ -81,7 +81,7 @@ This is because:
 However, the order of parts matters, since each argument's position contributes to 
 the key's identity. Two keys with the same values but in different positions are considered distinct. 
 
-```
+```csharp
 // These are NOT equal
 new QueryKey("todos", "active", 2);
 new QueryKey("todos", 2, "active");
@@ -96,7 +96,7 @@ Always include every variable that affects the data being fetched.
 Your query key acts as a dependency signature.
 
 Whenever any part of the key changes, BlazorQuery automatically refetches the data.
-```
+```csharp
 var query = new UseQuery<Todo>(
     key: new QueryKey("todo", todoId),
     fetchFn: () => FetchTodoById(todoId),

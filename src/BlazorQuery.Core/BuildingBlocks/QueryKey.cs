@@ -3,16 +3,35 @@ using System.Reflection;
 
 namespace BlazorQuery.Core.BuildingBlocks;
 
+/// <summary>
+/// Represents a composite key that uniquely identifies a query or cache entry.
+/// </summary>
+/// <remarks>
+/// A QueryKey combines multiple values into a single, comparable key. 
+/// Equality and hash calculations consider the structure and contents of each part, including: <br />
+///   - Primitive types <br />
+///   - Ordered collections <br />
+///   - Anonymous objects <br />
+///   - Record types <br />
+/// QueryKey does not currently support: <br />
+///   - Unordered collections <br />
+///   - Circular references within objects or collections <br />
+/// This ensures that queries can be distinguished not only by a single ID, 
+/// but also by complex sets of parameters.
+/// QueryKey instances are immutable and safe to use as keys in dictionaries or other 
+/// hash-based collections.
+/// </remarks>
 public class QueryKey : IEquatable<QueryKey>
 {
     public IReadOnlyList<object?> Parts { get; }
-    private readonly int _hashCode;
+    private readonly int _hash; 
     public QueryKey(params object?[] parts)
     {
         Parts = parts ?? Array.Empty<object>();
-        _hashCode = ComputeHash(Parts);
+        _hash = ComputeHash(Parts);
     }
 
+    public object? this[int index] => Parts[index];
     public override bool Equals(object? obj)
         => Equals(obj as QueryKey);
 
@@ -29,10 +48,7 @@ public class QueryKey : IEquatable<QueryKey>
         return true;
     }
 
-    public override int GetHashCode() => _hashCode;
-
-    public override string ToString() 
-        => $"QueryKey({string.Join(", ", Parts.Select(PartToString))})";
+    public override int GetHashCode() => _hash;
 
     private static int ComputeHash(IReadOnlyList<object?> parts)
     {
@@ -41,11 +57,15 @@ public class QueryKey : IEquatable<QueryKey>
             int hash = 17;
             foreach (var part in parts)
             {
-                hash = hash * 31 + PartHash(part);
+                int partHash = PartHash(part);
+                hash = hash * 31 + partHash;
             }
             return hash;
         }
     }
+
+    public override string ToString() 
+        => $"QueryKey({string.Join(", ", Parts.Select(PartToString))})";
 
     private static bool PartEquals(object? a, object? b)
     {

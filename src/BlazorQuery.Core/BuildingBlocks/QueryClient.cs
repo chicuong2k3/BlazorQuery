@@ -2,48 +2,104 @@
 
 namespace BlazorQuery.Core.BuildingBlocks;
 
+/// <summary>
+/// Manages caching, fetching, and invalidation of queries.
+/// </summary>
 public class QueryClient
 {
-    private readonly ConcurrentDictionary<QueryKey, CachedQuery> _cache = new();
+    private class CacheEntry
+    {
+        public object? Data { get; set; }
+        public Exception? Error { get; set; }
+        public DateTime FetchTime { get; set; }
+        public Task? OngoingFetch { get; set; }
+    }
+
+    private readonly ConcurrentDictionary<QueryKey, CacheEntry> _cache = new();
 
     public QueryClient()
     {
     }
 
-    public async Task<T> FetchAsync<T>(QueryKey key, Func<Task<T>> fetchFn, TimeSpan? staleTime = null)
+    /// <summary>
+    /// Fetches data for a query, using cache if possible and handling concurrent requests.
+    /// </summary>
+    public async Task<T> FetchAsync<T>(
+        QueryKey key,
+        Func<CancellationToken, Task<T>> fetchFn,
+        TimeSpan? staleTime = null,
+        CancellationToken? signal = null)
     {
-        if (_cache.TryGetValue(key, out var cached)
-            && !cached.IsStale(staleTime ?? TimeSpan.FromMinutes(5)))
+        var now = DateTime.UtcNow;
+        staleTime ??= TimeSpan.Zero;
+
+        var entry = _cache.GetOrAdd(key, _ => new CacheEntry());
+
+        if (entry.Data is T cachedData &&
+                entry.Error == null &&
+                (now - entry.FetchTime) <= staleTime)
         {
-            return (T)cached.Data;
+            return cachedData;
+        }   
+
+        if (entry.OngoingFetch != null)
+        {
+            await entry.OngoingFetch;
+            if (entry.Error != null) throw entry.Error;
+            return (T)entry.Data!;
         }
 
-        var data = await fetchFn();
-        if (data is null)
+        var tcs = new TaskCompletionSource();
+        entry.OngoingFetch = tcs.Task;
+
+        try
         {
-            throw new InvalidOperationException("Fetched data cannot be null.");
+            var result = await fetchFn(signal ?? CancellationToken.None);
+            entry.Data = result!;
+            entry.Error = null;
+            entry.FetchTime = now;
+            return result!;
         }
-        _cache[key] = new CachedQuery(data, DateTime.UtcNow);
-        return data;
+        catch (Exception ex)
+        {
+            entry.Error = ex;
+            throw;
+        }
+        finally
+        {
+            tcs.SetResult();
+            entry.OngoingFetch = null;
+        }
     }
 
+    /// <summary>
+    /// Invalidates a cached query.
+    /// </summary>
     public void Invalidate(QueryKey key)
     {
         _cache.TryRemove(key, out _);
     }
 
-    private class CachedQuery
+    /// <summary>
+    /// Retrieves cached data without refetching.
+    /// </summary>
+    public T? Get<T>(QueryKey key)
     {
-        public object Data { get; }
-        public DateTime FetchedAt { get; }
-
-        public CachedQuery(object data, DateTime fetchedAt)
+        if (_cache.TryGetValue(key, out var entry) && entry.Data is T data)
         {
-            Data = data;
-            FetchedAt = fetchedAt;
+            return data;
         }
+        return default;
+    }
 
-        public bool IsStale(TimeSpan staleTime)
-            => DateTime.UtcNow - FetchedAt > staleTime;
+    /// <summary>
+    /// Manually sets cached data.
+    /// </summary>
+    public void Set<T>(QueryKey key, T value)
+    {
+        var entry = _cache.GetOrAdd(key, _ => new CacheEntry());
+        entry.Data = value!;
+        entry.Error = null;
+        entry.FetchTime = DateTime.UtcNow;
     }
 }

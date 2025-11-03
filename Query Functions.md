@@ -1,144 +1,103 @@
 ﻿
+# What is a Query Function?
 
+A **Query Function** is any asynchronous method that fetches data. 
+It must either return **a result** or **throw an exception** so that BlazorQuery can track **loading** 
+and **error** states.
 
-In BlazorQuery, a Query Function is simply any Func<Task<T>> that fetches data asynchronously — usually from an API or database.
-It must either return a result or throw an exception for BlazorQuery to manage its loading and error states properly.
+Query functions receive a `QueryFunctionContext` that provides:
+- `QueryKey`: uniquely identifies the query.
+- `Signal`: a `CancellationToken` that allows query cancellation.
+- `Meta`: optional metadata for the query.
 
 # Basic Usage
 
-You define a query function inside your UseQuery<T> call.
-Here are all the valid patterns:
+You can define a query function in several ways depending on your needs:
 
-```
-await useQuery.UseQuery(
-    new QueryOptions<List<Todo>> {
-        QueryKey = new QueryKey("todos"),
-        QueryFn = () => FetchAllTodosAsync()
-    }
+```csharp
+// Simple query without parameters
+var query1 = new UseQuery<List<Todo>>(
+    key: new QueryKey("todos"),
+    fetchFn: async ctx => await FetchAllTodosAsync(),
+    client: queryClient
 );
 
-await useQuery.UseQuery(
-    new QueryOptions<Todo> {
-        QueryKey = new QueryKey("todo", todoId),
-        QueryFn = () => FetchTodoByIdAsync(todoId)
-    }
+// Query with a single parameter
+var query2 = new UseQuery<Todo>(
+    key: new QueryKey("todo", todoId),
+    fetchFn: async ctx => await FetchTodoByIdAsync(todoId),
+    client: queryClient
 );
 
-await useQuery.UseQuery(
-    new QueryOptions<Todo> {
-        QueryKey = new QueryKey("todo", todoId),
-        QueryFn = async () => {
-            var data = await FetchTodoByIdAsync(todoId);
-            return data;
-        }
-    }
-);
-
-// Access queryKey values inside queryFn
-await useQuery.UseQuery(
-    new QueryOptions<Todo> {
-        QueryKey = new QueryKey("todo", todoId),
-        QueryFn = (ctx) => FetchTodoByIdAsync((int)ctx.QueryKey[1])
-    }
+// Using QueryFunctionContext to access query key values
+var query3 = new UseQuery<Todo>(
+    key: new QueryKey("todo", todoId),
+    fetchFn: async ctx => {
+        var id = (int)ctx.QueryKey[1];
+        return await FetchTodoByIdAsync(id);
+    },
+    client: queryClient
 );
 ```
 
-# Handling and Throwing Errors
+# Handling Errors
 
-To mark a query as failed, throw an exception or return a faulted Task.
-BlazorQuery automatically tracks and exposes this via the .Error and .IsError states.
+BlazorQuery tracks query errors automatically. A query is considered failed if the function:
+- Throws an exception, or
+- Returns a faulted `Task<T>`
 
-```
-var result = await useQuery.UseQuery(
-    new QueryOptions<Todo> {
-        QueryKey = new QueryKey("todo", todoId),
-        QueryFn = async () => {
-            if (somethingGoesWrong)
-                throw new Exception("Oh no!");
+```csharp
+var query = new UseQuery<Todo>(
+    key: new QueryKey("todo", todoId),
+    fetchFn: async ctx => {
+        if (somethingGoesWrong)
+            throw new Exception("Something went wrong");
 
-            if (somethingElseGoesWrong)
-                return await Task.FromException<Todo>(new Exception("Oh no!"));
+        if (somethingElseGoesWrong)
+            return await Task.FromException<Todo>(new Exception("Something else went wrong"));
 
-            return await FetchTodoByIdAsync(todoId);
-        }
-    }
+        return await FetchTodoByIdAsync(todoId);
+    },
+    client: queryClient
 );
 
-if (result.IsError)
-    Console.WriteLine(result.Error.Message);
+await query.ExecuteAsync();
 
+if (query.IsError)
+    Console.WriteLine(query.Error!.Message);
 ```
 
-# Usage with HttpClient (like fetch)
+# Usage with HttpClient
 
-Unlike libraries such as HttpClientFactory or Refit, the built-in HttpClient doesn’t throw exceptions for failed responses —
-you’ll need to handle that manually:
+Some HTTP clients (like `HttpClient`) do not automatically throw exceptions for non-success HTTP responses. 
+In that case, you should check the response and throw manually:
 
-```
-var result = await useQuery.UseQuery(
-    new QueryOptions<Todo> {
-        QueryKey = new QueryKey("todo", todoId),
-        QueryFn = async () => {
-            var response = await http.GetAsync($"/api/todos/{todoId}");
-            if (!response.IsSuccessStatusCode)
-                throw new Exception($"Network response was not ok: {response.StatusCode}");
-            
-            return await response.Content.ReadFromJsonAsync<Todo>();
-        }
-    }
+```csharp
+var query = new UseQuery<Todo>(
+    key: new QueryKey("todo", todoId),
+    fetchFn: async ctx => {
+        var response = await http.GetAsync($"/api/todos/{todoId}");
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"Network response was not ok: {response.StatusCode}");
+
+        return await response.Content.ReadFromJsonAsync<Todo>()!;
+    },
+    client: queryClient
 );
 
+await query.ExecuteAsync();
 ```
 
-Query Function Variables
+# Cancellation
 
-Query Keys in BlazorQuery are passed into your query function context,
-so you can extract parameters dynamically.
+You can pass a `CancellationToken` to `ExecuteAsync` to cancel a running query:
 
-```
-await useQuery.UseQuery(
-    new QueryOptions<List<Todo>> {
-        QueryKey = new QueryKey("todos", new { Status = status, Page = page }),
-        QueryFn = FetchTodoListAsync
-    }
-);
+```csharp
+var cts = new CancellationTokenSource();
+await query.ExecuteAsync(cts.Token);
 
-public Task<List<Todo>> FetchTodoListAsync(QueryFunctionContext ctx)
-{
-    var (_, options) = ctx.Deconstruct<(string, dynamic)>();
-    var status = options.Status;
-    var page = options.Page;
-
-    return http.GetFromJsonAsync<List<Todo>>($"/api/todos?status={status}&page={page}");
-}
-
+// Later, cancel if needed
+cts.Cancel();
 ```
 
-# QueryFunctionContext
-
-Every query function receives a QueryFunctionContext object with useful info:
-
-Property	Type	Description
-QueryKey	QueryKey	The unique identifier for this query
-Signal	CancellationToken?	Used for canceling queries
-Meta	Dictionary<string, object>?	Optional metadata about the query
-
-```
-public async Task<List<Todo>> FetchTodoListAsync(QueryFunctionContext ctx)
-{
-    var (_, filter) = ctx.Deconstruct<(string, dynamic)>();
-    var status = filter.Status;
-    var page = filter.Page;
-
-    ctx.Signal?.ThrowIfCancellationRequested();
-
-    return await http.GetFromJsonAsync<List<Todo>>($"/api/todos?status={status}&page={page}", ctx.Signal ?? CancellationToken.None);
-}
-```
-
-Summary
-
-✅ A query function is any async function returning data or throwing errors
-✅ Always include variables (like IDs, filters) in your QueryKey
-✅ Use QueryFunctionContext to access key values and cancellation tokens
-✅ Errors must be thrown or returned as rejected tasks
+The token is automatically passed to your query function via `QueryFunctionContext.Signal`.
