@@ -7,10 +7,8 @@ namespace BlazorQuery.Core.BuildingBlocks;
 /// <typeparam name="T">The type of data returned by the query function.</typeparam>
 public class UseQuery<T>
 {
-    private readonly QueryKey _key;
-    private readonly Func<QueryFunctionContext, Task<T>> _fetchFn;
     private readonly QueryClient _client;
-    private readonly TimeSpan? _staleTime;
+    private readonly QueryOptions<T> _queryOptions;
 
     public T? Data { get; private set; }
     public bool IsLoading { get; private set; }
@@ -21,15 +19,11 @@ public class UseQuery<T>
     public event Action? OnChange;
 
     public UseQuery(
-            QueryKey key,
-            Func<QueryFunctionContext, Task<T>> fetchFn,
-            QueryClient client,
-            TimeSpan? staleTime = null)
+            QueryOptions<T> queryOptions,
+            QueryClient client)
     {
-        _key = key;
-        _fetchFn = fetchFn;
+        _queryOptions = queryOptions;
         _client = client;
-        _staleTime = staleTime ?? TimeSpan.Zero;
     }
 
     /// <summary>
@@ -43,8 +37,8 @@ public class UseQuery<T>
         try
         {
             var token = signal ?? CancellationToken.None;
-            var ctx = new QueryFunctionContext(_key, token);
-            Data = await _client.FetchAsync(_key, (token) => _fetchFn(ctx), _staleTime, token);
+            var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token);
+            Data = await _client.FetchAsync(_queryOptions.QueryKey, (token) => _queryOptions.QueryFn(ctx), _queryOptions.StaleTime, token);
             Error = null;
         }
         catch (Exception ex)
@@ -63,7 +57,7 @@ public class UseQuery<T>
     /// </summary>
     public async Task RefetchAsync(CancellationToken? signal = null)
     {
-        _client.Invalidate(_key);
+        _client.Invalidate(_queryOptions.QueryKey);
         await ExecuteAsync(signal);
     }
 

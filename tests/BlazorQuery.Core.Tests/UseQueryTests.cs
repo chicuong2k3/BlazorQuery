@@ -9,11 +9,10 @@ public class UseQueryTests
     [Fact]
     public async Task FetchData_ReturnsExpectedResult()
     {
-        var query = new UseQuery<List<string>>(
-            key: new QueryKey("todos"),
-            fetchFn: async ctx => await FakeApi.GetTodosAsync(),
-            client: _client
-        );
+        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("todos"),
+            queryFn: async ctx => await FakeApi.GetTodosAsync()
+        ), _client);
 
         await query.ExecuteAsync();
 
@@ -25,11 +24,10 @@ public class UseQueryTests
     [Fact]
     public async Task FetchData_ErrorIsHandled()
     {
-        var query = new UseQuery<string>(
-            key: new QueryKey("todo", -1),
-            fetchFn: async ctx => await FakeApi.GetTodoByIdAsync((int)ctx.QueryKey[1]!),
-            client: _client
-        );
+        var query = new UseQuery<string>(new QueryOptions<string>(
+            queryKey: new QueryKey("todos", -1),
+            queryFn: async ctx => await FakeApi.GetTodoByIdAsync((int)ctx.QueryKey[1]!)
+        ), _client);
 
         await query.ExecuteAsync();
 
@@ -43,15 +41,14 @@ public class UseQueryTests
     {
         int callCount = 0;
 
-        var query = new UseQuery<List<string>>(
-            key: new QueryKey("todos"),
-            fetchFn: async ctx => {
+        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("todos"),
+            queryFn: async ctx => {
                 callCount++;
                 return await FakeApi.GetTodosAsync();
             },
-            client: _client,
             staleTime: TimeSpan.FromSeconds(10)
-        );
+        ), _client);
 
         await query.ExecuteAsync();
         await query.ExecuteAsync();
@@ -64,15 +61,14 @@ public class UseQueryTests
     {
         int callCount = 0;
 
-        var query = new UseQuery<List<string>>(
-            key: new QueryKey("todos"),
-            fetchFn: async ctx => {
+        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("todos"),
+            queryFn: async ctx => {
                 callCount++;
                 return await FakeApi.GetTodosAsync();
             },
-            client: _client,
             staleTime: TimeSpan.FromSeconds(10)
-        );
+        ), _client);
 
         await query.ExecuteAsync();
         await query.RefetchAsync();
