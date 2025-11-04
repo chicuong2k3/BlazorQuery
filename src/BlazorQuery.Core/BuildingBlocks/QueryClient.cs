@@ -7,7 +7,8 @@ namespace BlazorQuery.Core.BuildingBlocks;
 /// </summary>
 public class QueryClient
 {
-    private class CacheEntry
+    public NetworkMode DefaultNetworkMode { get; set; } = NetworkMode.Online;
+    internal class CacheEntry
     {
         public object? Data { get; set; }
         public Exception? Error { get; set; }
@@ -101,5 +102,11 @@ public class QueryClient
         entry.Data = value!;
         entry.Error = null;
         entry.FetchTime = DateTime.UtcNow;
+    }
+
+    internal CacheEntry? GetCacheEntry(QueryKey key)
+    {
+        _cache.TryGetValue(key, out var entry);
+        return entry;
     }
 }
