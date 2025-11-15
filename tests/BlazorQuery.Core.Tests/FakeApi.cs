@@ -2,8 +2,10 @@
 
 public static class FakeApi
 {
-    public static Task<List<string>> GetTodosAsync()
-        => Task.FromResult(new List<string> { "Task 1", "Task 2" });
+    public static async Task<List<string>> GetTodosAsync()
+    {
+        return new List<string> { "Task 1", "Task 2" };
+    }
 
     public static Task<string> GetTodoByIdAsync(int id)
     {

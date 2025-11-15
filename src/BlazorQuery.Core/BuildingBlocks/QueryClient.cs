@@ -5,10 +5,11 @@ namespace BlazorQuery.Core.BuildingBlocks;
 /// <summary>
 /// Manages caching, fetching, and invalidation of queries.
 /// </summary>
-public class QueryClient
+public class QueryClient : IDisposable
 {
     public NetworkMode DefaultNetworkMode { get; set; } = NetworkMode.Online;
-    internal class CacheEntry
+    public IOnlineManager OnlineManager { get; private set; }
+    public class CacheEntry
     {
         public object? Data { get; set; }
         public Exception? Error { get; set; }
@@ -18,8 +19,16 @@ public class QueryClient
 
     private readonly ConcurrentDictionary<QueryKey, CacheEntry> _cache = new();
 
-    public QueryClient()
+    /// <summary>
+    /// Creates a new QueryClient with optional network awareness.
+    /// </summary>
+    /// <param name="onlineManager">
+    /// Optional. Defaults to in-memory manager if not provided.
+    /// </param>
+    public QueryClient(IOnlineManager? onlineManager = null)
     {
+        OnlineManager = onlineManager ?? new DefaultOnlineManager();
+        DefaultNetworkMode = NetworkMode.Online;
     }
 
     /// <summary>
@@ -104,9 +113,14 @@ public class QueryClient
         entry.FetchTime = DateTime.UtcNow;
     }
 
-    internal CacheEntry? GetCacheEntry(QueryKey key)
+    public CacheEntry? GetCacheEntry(QueryKey key)
     {
         _cache.TryGetValue(key, out var entry);
         return entry;
+    }
+
+    public void Dispose()
+    {
+        _cache.Clear();
     }
 }

@@ -1,251 +1,265 @@
 ﻿using BlazorQuery.Core.BuildingBlocks;
+using BlazorQuery.Core.Tests.Helpers;
+using Moq;
+
 namespace BlazorQuery.Core.Tests;
 
 public class UseQueryNetworkModeTests
 {
-    private QueryClient _client = new QueryClient();
+    private readonly Mock<IOnlineManager> _onlineManagerMock;
+    private QueryClient _queryClient = new QueryClient();
+    private readonly QueryKey _key = new("todos");
 
-    // Helper to reset state
-    private void Reset()
+    public UseQueryNetworkModeTests()
     {
-        _client = new QueryClient();
+        _onlineManagerMock = new Mock<IOnlineManager>();
+        _queryClient = new QueryClient(_onlineManagerMock.Object);
     }
 
-    
-    [Fact]
-    public async Task OnlineMode_Online_FetchingToIdle_Success()
+    protected void Dispose() => _queryClient?.Dispose();
+
+    private void SetOnline(bool isOnline) =>
+        _onlineManagerMock.Setup(m => m.IsOnline).Returns(isOnline);
+
+    private static async Task<List<string>> FakeNetworkApi()
     {
-        Reset();
-        OnlineManager.IsOnline = true;
+        await Task.Delay(50);
+        return new List<string> { "network-1", "network-2" };
+    }
 
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: new QueryKey("todos"),
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            networkMode: NetworkMode.Online
-        ), _client);
+    private void SeedCache<T>(T data, TimeSpan staleTime)
+    {
+        _queryClient.Set(_key, data);
+        var entry = _queryClient.GetCacheEntry(_key);
+        if (entry != null)
+            entry.FetchTime = DateTime.UtcNow - TimeSpan.FromMilliseconds(100);
+    }
 
-        Assert.True(query.IsLoading);
-        Assert.True(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.Equal(FetchStatus.Fetching, query.FetchStatus);
+    private UseQuery<T> CreateQuery<T>(
+        NetworkMode mode,
+        Func<QueryFunctionContext, Task<T>> queryFn,
+        TimeSpan? staleTime = null,
+        bool refetchOnReconnect = true)
+    {
+        return new UseQuery<T>(
+            new QueryOptions<T>(
+                queryKey: _key,
+                queryFn: queryFn,
+                networkMode: mode,
+                staleTime: staleTime ?? TimeSpan.Zero,
+                refetchOnReconnect: refetchOnReconnect
+            ),
+            _queryClient);
+    }
 
-        await query.ExecuteAsync();
-
-        Assert.False(query.IsLoading);
-        Assert.False(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.True(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Idle, query.FetchStatus);
+    private async Task<List<QuerySnapshot<T>>> ObserveQuery<T>(UseQuery<T> query)
+    {
+        using var observer = new QueryObserver<T>(query);
+        await observer.ExecuteAsync();
+        return observer.Snapshots;
     }
 
     [Fact]
-    public async Task OnlineMode_Offline_NoData_Paused_IsLoading()
+    public async Task OnlineMode_OnlineNetwork_ShouldFetchSuccess()
     {
-        Reset();
-        OnlineManager.IsOnline = false;
+        SetOnline(true);
+        var query = CreateQuery(NetworkMode.Online, _ => FakeNetworkApi());
 
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: new QueryKey("todos"),
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            networkMode: NetworkMode.Online
-        ), _client);
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
 
-        await query.ExecuteAsync();
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.False(final.IsLoading);
+        Assert.False(final.IsPaused);
+        Assert.NotNull(final.Data);
+        Assert.Equal(FetchStatus.Idle, final.FetchStatus);
+        Assert.Contains(snapshots, s => s.IsFetching || s.IsLoading);
+    }
 
-        Assert.True(query.IsLoading);  // Data == null
-        Assert.False(query.IsFetching);
+    [Fact]
+    public async Task OnlineMode_OfflineNetwork_NoCache_ShouldPause()
+    {
+        SetOnline(false);
+        var query = CreateQuery(NetworkMode.Online, _ => FakeNetworkApi());
+
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.True(final.Status == QueryStatus.Pending);
+        Assert.True(final.IsPaused);
+        Assert.True(final.IsLoading);
+        Assert.Null(final.Data);
+        Assert.Equal(FetchStatus.Paused, final.FetchStatus);
+    }
+
+    [Fact]
+    public async Task OnlineMode_OfflineNetwork_WithFreshCache_ShouldReturnCache()
+    {
+        SeedCache(new List<string> { "cached" }, TimeSpan.FromMinutes(5));
+        SetOnline(false);
+        var query = CreateQuery(NetworkMode.Online, _ => FakeNetworkApi(), TimeSpan.FromMinutes(5));
+
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.False(final.IsLoading);
+        Assert.False(final.IsPaused);
+        Assert.NotNull(final.Data);
+        Assert.Equal(FetchStatus.Idle, final.FetchStatus);
+    }
+
+    [Fact]
+    public async Task AlwaysMode_OfflineNetwork_ShouldError()
+    {
+        SetOnline(false);
+        var query = CreateQuery<List<string>>(NetworkMode.Always, _ =>
+        {
+            throw new InvalidOperationException("Offline");
+        });
+
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.True(final.Status == QueryStatus.Error);
+        Assert.False(final.IsPaused);
+        Assert.NotNull(final.Error);
+        Assert.Equal(FetchStatus.Idle, final.FetchStatus);
+    }
+
+    [Fact]
+    public async Task OfflineFirstMode_OfflineNetwork_NoCache_ShouldPause()
+    {
+        SetOnline(false);
+        var query = CreateQuery(NetworkMode.OfflineFirst, _ => FakeNetworkApi());
+
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.False(final.Status == QueryStatus.Success);
+        Assert.True(final.IsPaused);
+        Assert.True(final.IsLoading);
+        Assert.Null(final.Data);
+        Assert.Equal(FetchStatus.Paused, final.FetchStatus);
+    }
+
+    [Fact]
+    public async Task OfflineFirstMode_OfflineNetwork_WithFreshCache_ShouldReturnCache()
+    {
+        SeedCache(new List<string> { "fresh" }, TimeSpan.FromMinutes(5));
+        SetOnline(false);
+        var query = CreateQuery(NetworkMode.OfflineFirst, _ => FakeNetworkApi(), TimeSpan.FromMinutes(5));
+
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.False(final.IsLoading);
+        Assert.False(final.IsPaused);
+        Assert.Contains("fresh", final.Data!);
+        Assert.Equal(FetchStatus.Idle, final.FetchStatus);
+    }
+
+    [Fact]
+    public async Task OfflineFirstMode_OfflineNetwork_StaleCache_ShouldPause()
+    {
+        SeedCache(new List<string> { "stale" }, TimeSpan.FromMilliseconds(1));
+        await Task.Delay(10); 
+        SetOnline(false);
+
+        var query = CreateQuery(NetworkMode.OfflineFirst, _ => FakeNetworkApi(), TimeSpan.FromMilliseconds(1));
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.True(final.IsPaused);
+        Assert.False(final.IsLoading);
+        Assert.Contains("stale", final.Data!);
+        Assert.Equal(FetchStatus.Paused, final.FetchStatus);
+    }
+
+    [Fact]
+    public async Task OfflineFirstMode_Reconnect_ShouldAutoRefetch()
+    {
+        SetOnline(false);
+        var refetchCount = 0;
+        var query = CreateQuery(NetworkMode.OfflineFirst, _ =>
+        {
+            refetchCount++;
+            return FakeNetworkApi();
+        }, TimeSpan.FromMilliseconds(500), refetchOnReconnect: true);
+
+        var observerTask = ObserveQuery(query);
+
+        await Task.Delay(50);
+        SetOnline(true); // simulate reconnect
+        await Task.Delay(100);
+
+        var snapshots = await observerTask;
+        var final = snapshots.Last();
+
+        Assert.True(refetchCount > 0);
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.Contains("network", final.Data![0]);
+    }
+
+    [Fact]
+    public async Task BackgroundRefetch_ShouldSetIsFetchingBackground()
+    {
+        SeedCache(new List<string> { "stale" }, TimeSpan.FromMilliseconds(500));
+        await Task.Delay(50);
+        SetOnline(true);
+
+        var query = CreateQuery(NetworkMode.OfflineFirst, _ => FakeNetworkApi(), TimeSpan.FromMilliseconds(1));
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        // Background fetch có trigger
+        Assert.True(snapshots.Any(s => s.IsFetchingBackground));
+        Assert.False(snapshots.First().IsInitialLoading); // data existed
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.False(final.IsFetchingBackground);
+    }
+
+    [Fact]
+    public async Task OnlineMode_OfflineMidFetch_ThenReconnect_ShouldRefetchFromStart()
+    {
+        var tcsFirstFetch = new TaskCompletionSource<List<string>>();
+        var tcsSecondFetch = new TaskCompletionSource<List<string>>();
+        var fetchCount = 0;
+
+        var queryFn = new Func<QueryFunctionContext, Task<List<string>>>(async ctx =>
+        {
+            fetchCount++;
+            if (fetchCount == 1)
+                return await tcsFirstFetch.Task; // first fetch will be cancelled
+            else
+                return await tcsSecondFetch.Task; // second fetch after reconnect
+        });
+
+        SetOnline(true);
+        var query = CreateQuery(NetworkMode.Online, queryFn);
+        var observerTask = ObserveQuery(query);
+
+        await Task.Delay(20); // mid-fetch
+        SetOnline(false);     // simulate offline
+
+        // mid-fetch should be cancelled
+        tcsFirstFetch.TrySetResult(new List<string> { "should not be used" });
+        await Task.Delay(50);
+
         Assert.True(query.IsPaused);
-        Assert.False(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Paused, query.FetchStatus);
-    }
 
-    [Fact]
-    public async Task OnlineMode_Offline_WithFreshData_Paused_ButNotLoading()
-    {
-        Reset();
-        var key = new QueryKey("todos");
-        _client.Set(key, new List<string> { "cached" }, staleTime: TimeSpan.FromMinutes(5));
+        // restore network
+        SetOnline(true);
+        tcsSecondFetch.TrySetResult(new List<string> { "refetched" });
 
-        OnlineManager.IsOnline = false;
+        var snapshots = await observerTask;
+        var final = snapshots.Last();
 
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: key,
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            staleTime: TimeSpan.FromMinutes(10),
-            networkMode: NetworkMode.Online
-        ), _client);
-
-        await query.ExecuteAsync();
-
-        Assert.False(query.IsLoading); // Data exists
-        Assert.False(query.IsFetching);
-        Assert.True(query.IsPaused);   // Still paused because online-only
-        Assert.True(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Paused, query.FetchStatus);
-    }
-
-    // ================================
-    // ALWAYS MODE
-    // ================================
-
-    [Fact]
-    public async Task AlwaysMode_Online_FetchingToIdle_Success()
-    {
-        Reset();
-        OnlineManager.IsOnline = true;
-
-        var query = new UseQuery<string>(new QueryOptions<string>(
-            queryKey: new QueryKey("todo", 1),
-            queryFn: async ctx => await FakeApi.GetTodoByIdAsync((int)ctx.QueryKey[1]!),
-            networkMode: NetworkMode.Always
-        ), _client);
-
-        Assert.True(query.IsLoading);
-        Assert.True(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.Equal(FetchStatus.Fetching, query.FetchStatus);
-
-        await query.ExecuteAsync();
-
-        Assert.False(query.IsLoading);
-        Assert.False(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.True(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Idle, query.FetchStatus);
-    }
-
-    [Fact]
-    public async Task AlwaysMode_Offline_FetchingToIdle_Error_IsLoading()
-    {
-        Reset();
-        OnlineManager.IsOnline = false;
-
-        var query = new UseQuery<string>(new QueryOptions<string>(
-            queryKey: new QueryKey("todo", -1),
-            queryFn: async ctx => await FakeApi.GetTodoByIdAsync((int)ctx.QueryKey[1]!),
-            networkMode: NetworkMode.Always
-        ), _client);
-
-        Assert.True(query.IsLoading);
-        Assert.True(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.Equal(FetchStatus.Fetching, query.FetchStatus);
-
-        await Assert.ThrowsAsync<Exception>(() => query.ExecuteAsync());
-
-        Assert.True(query.IsLoading);  // Data still null
-        Assert.False(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.True(query.IsError);
-        Assert.False(query.IsSuccess);
-        Assert.Equal(FetchStatus.Idle, query.FetchStatus);
-    }
-
-    // ================================
-    // OFFLINE-FIRST MODE
-    // ================================
-
-    [Fact]
-    public async Task OfflineFirstMode_Online_FetchingToIdle_Success()
-    {
-        Reset();
-        OnlineManager.IsOnline = true;
-
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: new QueryKey("todos"),
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            networkMode: NetworkMode.OfflineFirst
-        ), _client);
-
-        Assert.True(query.IsLoading);
-        Assert.True(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.Equal(FetchStatus.Fetching, query.FetchStatus);
-
-        await query.ExecuteAsync();
-
-        Assert.False(query.IsLoading);
-        Assert.False(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.True(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Idle, query.FetchStatus);
-    }
-
-    [Fact]
-    public async Task OfflineFirstMode_Offline_DataStale_Paused_IsLoading()
-    {
-        Reset();
-        OnlineManager.IsOnline = false;
-
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: new QueryKey("todos"),
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            staleTime: TimeSpan.Zero, // force stale
-            networkMode: NetworkMode.OfflineFirst
-        ), _client);
-
-        await query.ExecuteAsync();
-
-        Assert.True(query.IsLoading);
-        Assert.False(query.IsFetching);
-        Assert.True(query.IsPaused);
-        Assert.False(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Paused, query.FetchStatus);
-    }
-
-    [Fact]
-    public async Task OfflineFirstMode_Offline_DataFresh_Idle_IsSuccess_NoLoading()
-    {
-        Reset();
-
-        // Pre-populate cache with fresh data
-        var key = new QueryKey("todos");
-        _client.Set(key, new List<string> { "a", "b" }, staleTime: TimeSpan.FromMinutes(10));
-
-        OnlineManager.IsOnline = false;
-
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: key,
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            staleTime: TimeSpan.FromMinutes(10),
-            networkMode: NetworkMode.OfflineFirst
-        ), _client);
-
-        await query.ExecuteAsync();
-
-        Assert.False(query.IsLoading);
-        Assert.False(query.IsFetching);
-        Assert.False(query.IsPaused);
-        Assert.True(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Idle, query.FetchStatus);
-    }
-
-    [Fact]
-    public async Task OfflineFirstMode_Offline_NoData_Paused_IsLoading()
-    {
-        Reset();
-        OnlineManager.IsOnline = false;
-
-        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
-            queryKey: new QueryKey("todos"),
-            queryFn: async ctx => await FakeApi.GetTodosAsync(),
-            networkMode: NetworkMode.OfflineFirst
-        ), _client);
-
-        await query.ExecuteAsync();
-
-        Assert.True(query.IsLoading);
-        Assert.False(query.IsFetching);
-        Assert.True(query.IsPaused);
-        Assert.False(query.IsSuccess);
-        Assert.False(query.IsError);
-        Assert.Equal(FetchStatus.Paused, query.FetchStatus);
+        Assert.True(final.Status == QueryStatus.Success);
+        Assert.Contains("refetched", final.Data!);
+        Assert.Equal(FetchStatus.Idle, final.FetchStatus);
+        Assert.Equal(2, fetchCount); // first cancelled, second refetch
     }
 }
