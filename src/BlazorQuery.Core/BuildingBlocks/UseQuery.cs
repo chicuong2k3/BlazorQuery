@@ -31,8 +31,6 @@ public class UseQuery<T> : IDisposable
             Notify();
         }
     }
-    public bool IsFetching => FetchStatus == FetchStatus.Fetching;
-    public bool IsPaused => FetchStatus == FetchStatus.Paused;
 
     private T? _data;
     public T? Data 
@@ -65,13 +63,12 @@ public class UseQuery<T> : IDisposable
                 ? QueryStatus.Pending
                 : QueryStatus.Success;
 
-    public bool IsPending => Status == QueryStatus.Pending;
-    public bool IsSuccess => Status == QueryStatus.Success;
-    public bool IsError => Status == QueryStatus.Error;
-    public bool IsInitialLoading => Data == null && IsFetching && Status == QueryStatus.Pending;
-    private bool _isBackgroundFetch;
-    public bool IsFetchingBackground => _isBackgroundFetch;
-    public bool IsLoading => (IsFetching || IsPaused) && Data == null && !IsError;  
+    public bool IsFetchingBackground { get; private set; }
+    public bool IsLoading => FetchStatus == FetchStatus.Fetching
+                                && Data == null;
+
+    public int FailureCount { get; private set; }
+    public bool IsRefetchError { get; private set; }
 
     public event Action? OnChange;
     private readonly Action _onlineStatusHandler;
@@ -102,20 +99,22 @@ public class UseQuery<T> : IDisposable
     {
         try
         {
-            await OnOnlineStatusChangedAsync();
+            await Task.Yield();
+            await OnOnlineStatusChangedAsync().ConfigureAwait(false);
         }
         catch
         {
+            // ignore
         }
     }
-    private async Task OnOnlineStatusChangedAsync()
+    private Task OnOnlineStatusChangedAsync()
     {
         if (!_onlineManager.IsOnline)
-            return;
+            return Task.CompletedTask;
 
         // if there's already a fetch in progress, don't start another
-        if (IsFetching)
-            return;
+        if (FetchStatus == FetchStatus.Fetching)
+            return Task.CompletedTask;
 
         var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
         var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
@@ -124,88 +123,126 @@ public class UseQuery<T> : IDisposable
         if ((_queryOptions.NetworkMode == NetworkMode.Online && FetchStatus == FetchStatus.Paused) ||
             (_queryOptions.NetworkMode == NetworkMode.OfflineFirst && (entry == null || isDataStale)))
         {
-            await ExecuteAsync();
+            _ = ExecuteAsync();
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Executes the query.
+    /// Executes the query manually.
     /// </summary>
     public async Task ExecuteAsync(CancellationToken? signal = null)
     {
         await _fetchLock.WaitAsync();
+        CancellationTokenSource? linkedCts = null;
 
         try
         {
-            _currentCts?.Cancel();
-            _currentCts?.Dispose();
+            // Cancel _currentCts only if a fetch is already running
+            if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
+            {
+                _currentCts.Cancel();
+                _currentCts.Dispose();
+                _currentCts = null;
+            }
             _currentCts = new CancellationTokenSource();
-            using var linkedCts = signal.HasValue
-                ? CancellationTokenSource.CreateLinkedTokenSource(_currentCts.Token, signal.Value)
-                : CancellationTokenSource.CreateLinkedTokenSource(_currentCts.Token);
 
-            var token = linkedCts.Token;
+            var token = _currentCts.Token;
+
+            if (signal.HasValue)
+            {
+                linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, signal.Value);
+                token = linkedCts.Token;
+            }
 
             var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
+
+            // Optimistically set data from cache if it exists
+            if (entry != null && entry.Data is T cached)
+            {
+                Data = cached;
+            }
+
+
             var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
                                             (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
 
-            var shouldPause = (_queryOptions.NetworkMode != NetworkMode.Always &&
-                              ((_queryOptions.NetworkMode == NetworkMode.Online && !_onlineManager.IsOnline) ||
-                               (_queryOptions.NetworkMode == NetworkMode.OfflineFirst && !_onlineManager.IsOnline && isDataStale)));
+            var shouldPause = _queryOptions.NetworkMode != NetworkMode.Always 
+                                && !_onlineManager.IsOnline;
 
             if (shouldPause)
             {
                 FetchStatus = FetchStatus.Paused;
+                return;
+            }
 
-                if (entry?.Data is T cached)
-                    Data = cached;
-
+            // If data is fresh, no need to fetch
+            if (!isDataStale)
+            {
                 return;
             }
 
             // Background fetch: data exists but stale
-            if (Data != null && isDataStale)
+            bool isRefetch = Data != null && isDataStale;
+            if (isRefetch)
             {
-                _isBackgroundFetch = true;
+                IsFetchingBackground = true;
                 Notify();
             }
 
             FetchStatus = FetchStatus.Fetching;
 
-            try
-            {
-                var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token);
-                Data = await _client.FetchAsync(_queryOptions.QueryKey,
-                                                _ => _queryOptions.QueryFn(ctx),
-                                                _queryOptions.StaleTime,
-                                                token);
-                Error = null;
-            }
-            catch (OperationCanceledException) when (
-                !_onlineManager.IsOnline 
-                && _queryOptions.NetworkMode != NetworkMode.Always)
-            {
-                FetchStatus = FetchStatus.Paused;
-                _isBackgroundFetch = false;
-                return;
-            }
-            catch (Exception ex)
-            {
-                Error = ex;
-            }
-            finally
-            {
-                _isBackgroundFetch = false;
-                if (FetchStatus != FetchStatus.Paused)
-                {
-                    FetchStatus = FetchStatus.Idle;
-                }
+            FailureCount = 0;
+            IsRefetchError = false;
+            Exception? lastError = null;
+            int maxRetries = _queryOptions.Retry ?? 0;
 
+            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token);
+                    Data = await _client.FetchAsync(_queryOptions.QueryKey,
+                                                    _ => _queryOptions.QueryFn(ctx),
+                                                    _queryOptions.StaleTime,
+                                                    token);
+                    Error = null;
+                    return;
+                }
+                catch (OperationCanceledException)
+                {
+                    if (_queryOptions.NetworkMode != NetworkMode.Always)
+                    {
+                        FetchStatus = FetchStatus.Paused;
+                        IsFetchingBackground = false;
+                        return;
+                    }
+                    throw; 
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                    FailureCount++;
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay((int)Math.Pow(2, attempt) * 1000, token);
+                    }
+                }
             }
+
+            Error = lastError;
+            IsRefetchError = isRefetch;
         }
         finally
         {
+            IsFetchingBackground = false;
+            if (FetchStatus != FetchStatus.Paused)
+            {
+                FetchStatus = FetchStatus.Idle;
+            }
+
+            linkedCts?.Dispose();
             _fetchLock.Release();
         }
     }
@@ -217,6 +254,25 @@ public class UseQuery<T> : IDisposable
     }
 
     private void Notify() => OnChange?.Invoke();
+
+    public void HandleOffline()
+    {
+        // Cancel any ongoing fetch
+        if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
+        {
+            try
+            {
+                _currentCts.Cancel();
+            }
+            finally
+            {
+                _currentCts.Dispose();
+                _currentCts = null;
+            }
+        }
+
+        FetchStatus = FetchStatus.Paused;
+    }
 
     public void Dispose()
     {

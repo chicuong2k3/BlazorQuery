@@ -10,13 +10,15 @@ public class QueryOptions<T>
         Func<QueryFunctionContext, Task<T>> queryFn, 
         TimeSpan? staleTime = null, 
         NetworkMode networkMode = NetworkMode.Online,
-        bool refetchOnReconnect = true)
+        bool refetchOnReconnect = true,
+        int? retry = null)
     {
         QueryKey = queryKey;
         QueryFn = queryFn;
         StaleTime = staleTime ?? TimeSpan.Zero;
         NetworkMode = networkMode;
         RefetchOnReconnect = refetchOnReconnect;
+        Retry = retry;
     }
 
     public QueryKey QueryKey { get; init; } = null!;
@@ -24,4 +26,5 @@ public class QueryOptions<T>
     public TimeSpan StaleTime { get; init; } = TimeSpan.Zero;
     public NetworkMode NetworkMode { get; set; } = NetworkMode.Online;
     public bool RefetchOnReconnect { get; set; } = true;
+    public int? Retry { get; init; }
 }

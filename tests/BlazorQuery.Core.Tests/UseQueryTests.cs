@@ -16,7 +16,7 @@ public class UseQueryTests
 
         await query.ExecuteAsync();
 
-        Assert.False(query.IsError);
+        Assert.False(query.Status == QueryStatus.Error);
         Assert.NotNull(query.Data);
         Assert.Equal(2, query.Data.Count);
     }
@@ -31,7 +31,7 @@ public class UseQueryTests
 
         await query.ExecuteAsync();
 
-        Assert.True(query.IsError);
+        Assert.True(query.Status == QueryStatus.Error);
         Assert.NotNull(query.Error);
         Assert.Equal("Invalid ID", query.Error.Message);
     }
