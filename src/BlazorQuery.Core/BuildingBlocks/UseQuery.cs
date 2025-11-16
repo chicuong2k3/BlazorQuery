@@ -72,6 +72,7 @@ public class UseQuery<T> : IDisposable
 
     public event Action? OnChange;
     private readonly Action _onlineStatusHandler;
+    private CancellationTokenSource? _staleTimerCts;
 
     public UseQuery(
             QueryOptions<T> queryOptions,
@@ -137,8 +138,12 @@ public class UseQuery<T> : IDisposable
         await _fetchLock.WaitAsync();
         CancellationTokenSource? linkedCts = null;
 
+        bool isRefetch = false;
+
         try
         {
+            _staleTimerCts?.Cancel();
+
             // Cancel _currentCts only if a fetch is already running
             if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
             {
@@ -184,7 +189,7 @@ public class UseQuery<T> : IDisposable
             }
 
             // Background fetch: data exists but stale
-            bool isRefetch = Data != null && isDataStale;
+            isRefetch = Data != null && isDataStale;
             if (isRefetch)
             {
                 IsFetchingBackground = true;
@@ -208,6 +213,16 @@ public class UseQuery<T> : IDisposable
                                                     _queryOptions.StaleTime,
                                                     token);
                     Error = null;
+
+                    if (entry != null)
+                        entry.FetchTime = DateTime.UtcNow;
+
+                    // start the timer so we refetch automatically when stale
+                    if (isRefetch == false)
+                    {
+                        StartStaleTimer();
+                    }
+
                     return;
                 }
                 catch (OperationCanceledException)
@@ -236,7 +251,11 @@ public class UseQuery<T> : IDisposable
         }
         finally
         {
-            IsFetchingBackground = false;
+            if (!isRefetch)
+            {
+                IsFetchingBackground = false;
+            }
+
             if (FetchStatus != FetchStatus.Paused)
             {
                 FetchStatus = FetchStatus.Idle;
@@ -272,6 +291,41 @@ public class UseQuery<T> : IDisposable
         }
 
         FetchStatus = FetchStatus.Paused;
+    }
+
+    /// <summary>
+    /// Starts a timer that will trigger a background refetch
+    /// when the cached data becomes stale.
+    /// </summary>
+    private void StartStaleTimer()
+    {
+        if (_staleTimerCts != null && !_staleTimerCts.IsCancellationRequested)
+            return;
+
+        // Cancel any previous timer to prevent overlapping refetches
+        _staleTimerCts?.Cancel();
+        _staleTimerCts?.Dispose();
+        _staleTimerCts = null;
+
+        if (_queryOptions.StaleTime <= TimeSpan.Zero)
+            return;  
+
+        _staleTimerCts = new CancellationTokenSource();
+
+        // ContinueWith runs on the thread-pool so we don't block the UI.
+        _ = Task.Delay(_queryOptions.StaleTime, _staleTimerCts.Token)
+                .ContinueWith(t =>
+                {
+                    // If the delay was cancelled then do nothing
+                    if (t.IsCanceled) return;
+
+                    if (_onlineManager.IsOnline && FetchStatus == FetchStatus.Idle)
+                    {
+                        IsFetchingBackground = true;
+                        Notify();
+                        _ = ExecuteAsync();
+                    }
+                }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
 
     public void Dispose()

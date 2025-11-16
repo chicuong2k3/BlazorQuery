@@ -283,4 +283,148 @@ public class UseQueryNetworkModeTests
         Assert.Equal(2, fetchCount);
     }
 
+    [Fact]
+    public async Task StaleTime_WhenDataBecomesStale_ShouldRefetchInBackground()
+    {
+        var fetchCount = 0;
+        var query = CreateQuery(
+            NetworkMode.Online,
+            _ => { fetchCount++; return Task.FromResult(new List<string> { "data" }); },
+            staleTime: TimeSpan.FromMilliseconds(100));
+
+        SetOnline(true);
+        await query.ExecuteAsync();
+        Assert.Equal(1, fetchCount);
+
+        await Task.Delay(200); // exceed staleTime
+
+        Assert.Equal(2, fetchCount); // background refetch
+        Assert.True(query.IsFetchingBackground);
+    }
+
+    //[Fact]
+    //public async Task RefetchInterval_ShouldPollAtInterval()
+    //{
+    //    var fetchCount = 0;
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        _ => { fetchCount++; return Task.FromResult(new List<string>()); },
+    //        refetchInterval: TimeSpan.FromMilliseconds(100));
+
+    //    SetOnline(true);
+    //    await query.ExecuteAsync();
+
+    //    await Task.Delay(350);
+    //    Assert.True(fetchCount >= 3); 
+    //}
+
+    [Fact]
+    public async Task Retry_WhenFetchFails_ShouldRetrySpecifiedTimes()
+    {
+        var fetchCount = 0;
+        var tcs = new TaskCompletionSource<List<string>>();
+
+        var query = CreateQuery<List<string>>(
+            NetworkMode.Online,
+            _ =>
+            {
+                fetchCount++;
+                if (fetchCount < 4)
+                    throw new Exception("Fail");
+                return Task.FromResult(new List<string> { "success" });
+            },
+            retry: 3);
+
+        SetOnline(true);
+        var snapshots = await ObserveQuery(query);
+        var final = snapshots.Last();
+
+        Assert.Equal(QueryStatus.Success, final.Status);
+        Assert.Equal(4, fetchCount); 
+        Assert.Equal(3, query.FailureCount);
+    }
+
+    //[Fact]
+    //public async Task RefetchOnMount_WhenDataFresh_ShouldNotRefetch()
+    //{
+    //    SeedCache(new List<string> { "cached" }, TimeSpan.FromMinutes(5));
+    //    var fetchCount = 0;
+
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        _ => { fetchCount++; return FakeNetworkApi(); },
+    //        staleTime: TimeSpan.FromMinutes(5),
+    //        refetchOnMount: true);
+
+    //    SetOnline(true);
+    //    await ObserveQuery(query);
+
+    //    Assert.Equal(0, fetchCount); // không fetch vì fresh
+    //}
+
+    //[Fact]
+    //public async Task RefetchOnWindowFocus_WhenEnabled_ShouldRefetch()
+    //{
+    //    var fetchCount = 0;
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        _ => { fetchCount++; return Task.FromResult(new List<string>()); },
+    //        refetchOnWindowFocus: true);
+
+    //    SetOnline(true);
+    //    await query.ExecuteAsync();
+    //    fetchCount = 0;
+
+    //    // Simulate focus
+    //    _queryClient.NotifyWindowFocus();
+
+    //    await Task.Delay(100);
+    //    Assert.Equal(1, fetchCount); // React Query refetch
+    //}
+
+    //[Fact]
+    //public async Task PlaceholderData_ShouldShowBeforeFetch()
+    //{
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        _ => Task.Delay(100).ContinueWith(_ => new List<string> { "real" }),
+    //        placeholderData: new List<string> { "placeholder" });
+
+    //    var observer = new QueryObserver<List<string>>(query);
+    //    await query.ExecuteAsync();
+
+    //    var first = observer.Snapshots.First();
+    //    Assert.Contains("placeholder", first.Data!);
+    //}
+
+    //[Fact]
+    //public async Task Select_ShouldTransformData()
+    //{
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        _ => Task.FromResult(new List<string> { "a", "b" }),
+    //        select: data => data.Select(x => x.ToUpper()).ToList());
+
+    //    var snapshots = await ObserveQuery(query);
+    //    var final = snapshots.Last();
+
+    //    Assert.Contains("A", final.Data!);
+    //    Assert.Contains("B", final.Data!);
+    //}
+
+    //[Fact]
+    //public async Task GcTime_AfterInactive_ShouldRemoveFromCache()
+    //{
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        _ => Task.FromResult(new List<string> { "data" }),
+    //        gcTime: TimeSpan.FromMilliseconds(100));
+
+    //    await query.ExecuteAsync();
+    //    query.Dispose();
+
+    //    await Task.Delay(200);
+    //    var entry = _queryClient.GetCacheEntry(_key);
+    //    Assert.Null(entry); // bị garbage collected
+    //}
 }
