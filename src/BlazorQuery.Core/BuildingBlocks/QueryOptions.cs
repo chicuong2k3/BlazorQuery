@@ -28,3 +28,15 @@ public class QueryOptions<T>
     public bool RefetchOnReconnect { get; set; } = true;
     public int? Retry { get; init; }
 }
+
+public class QueryOptions : QueryOptions<object?>
+{
+    public QueryOptions(QueryKey queryKey,
+                        Func<QueryFunctionContext, Task<object?>> queryFn,
+                        TimeSpan? staleTime = null,
+                        NetworkMode networkMode = NetworkMode.Online,
+                        bool refetchOnReconnect = true,
+                        int? retry = null) : base(queryKey, queryFn, staleTime, networkMode, refetchOnReconnect, retry)
+    {
+    }
+}
