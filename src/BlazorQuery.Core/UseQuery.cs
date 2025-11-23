@@ -1,5 +1,4 @@
-﻿
-namespace BlazorQuery.Core.BuildingBlocks;
+﻿namespace BlazorQuery.Core;
 
 /// <summary>
 /// Represents a single query that fetches data asynchronously and tracks its loading/error state.
@@ -207,7 +206,7 @@ public class UseQuery<T> : IDisposable
             {
                 try
                 {
-                    var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token);
+                    var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token, _queryOptions.Meta);
                     Data = await _client.FetchAsync(_queryOptions.QueryKey,
                                                     _ => _queryOptions.QueryFn(ctx),
                                                     _queryOptions.StaleTime,

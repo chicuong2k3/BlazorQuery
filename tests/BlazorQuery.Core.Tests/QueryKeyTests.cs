@@ -1,6 +1,4 @@
-using BlazorQuery.Core.BuildingBlocks;
-
-namespace BlazorQuery.Tests.BuildingBlocks;
+namespace BlazorQuery.Core.Tests;
 
 public class QueryKeyTests
 {

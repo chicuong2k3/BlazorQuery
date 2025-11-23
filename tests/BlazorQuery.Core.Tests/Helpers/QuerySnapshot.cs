@@ -1,6 +1,4 @@
-﻿using BlazorQuery.Core.BuildingBlocks;
-
-namespace BlazorQuery.Core.Tests.Helpers;
+﻿namespace BlazorQuery.Core.Tests.Helpers;
 
 public class QuerySnapshot<T>
 {

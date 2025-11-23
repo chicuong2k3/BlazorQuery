@@ -1,6 +1,4 @@
-﻿
-
-namespace BlazorQuery.Core.BuildingBlocks;
+﻿namespace BlazorQuery.Core;
 
 public class UseQueries<T> : IDisposable
 {

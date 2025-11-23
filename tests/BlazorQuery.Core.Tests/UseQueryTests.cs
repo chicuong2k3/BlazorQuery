@@ -1,6 +1,4 @@
-﻿using BlazorQuery.Core.BuildingBlocks;
-
-namespace BlazorQuery.Core.Tests;
+﻿namespace BlazorQuery.Core.Tests;
 
 public class UseQueryTests
 {
@@ -74,5 +72,59 @@ public class UseQueryTests
         await query.RefetchAsync();
 
         Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public async Task MetadataIsPassedToQueryFn()
+    {
+        var meta = new Dictionary<string, object> { { "filter", "active" } };
+        var query = new UseQuery<List<string>>(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("todos"),
+            queryFn: async ctx =>
+            {
+                if (ctx.Meta != null && ctx.Meta.TryGetValue("filter", out var filterValue))
+                {
+                    // Simulate filtered fetch
+                    return new List<string> { $"Filtered: {(string)filterValue}" };
+                }
+                return await FakeApi.GetTodosAsync();
+            },
+            meta: meta
+        ), _client);
+        await query.ExecuteAsync();
+        Assert.Equal(QueryStatus.Success, query.Status);
+        Assert.NotNull(query.Data);
+        Assert.Collection(query.Data, item => Assert.Equal("Filtered: active", item));
+    }
+
+    [Fact]
+    public async Task ManualErrorThrowingWithNonThrowingClient()
+    {
+        var query = new UseQuery<string>(new QueryOptions<string>(
+            queryKey: new QueryKey("todo", 404),
+            queryFn: async ctx =>
+            {
+                // Simulate HttpClient response
+                var fakeResponse = new { IsSuccessStatusCode = false, StatusCode = 404 };
+                if (!fakeResponse.IsSuccessStatusCode)
+                    throw new Exception($"Response was not ok: {fakeResponse.StatusCode}");
+                return "Success";
+            }
+        ), _client);
+        await query.ExecuteAsync();
+        Assert.Equal(QueryStatus.Error, query.Status);
+        Assert.Contains("not ok: 404", query.Error?.Message);
+    }
+
+    [Fact]
+    public async Task SynchronousThrowIsHandled()
+    {
+        var query = new UseQuery<string>(new QueryOptions<string>(
+            queryKey: new QueryKey("sync-error"),
+            queryFn: ctx => throw new Exception("Sync error")
+        ), _client);
+        await query.ExecuteAsync();
+        Assert.Equal(QueryStatus.Error, query.Status);
+        Assert.Equal("Sync error", query.Error?.Message);
     }
 }

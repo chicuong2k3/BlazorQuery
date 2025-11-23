@@ -1,5 +1,4 @@
-﻿using BlazorQuery.Core.BuildingBlocks;
-using BlazorQuery.Core.Tests.Helpers;
+﻿using BlazorQuery.Core.Tests.Helpers;
 using Moq;
 
 namespace BlazorQuery.Core.Tests;

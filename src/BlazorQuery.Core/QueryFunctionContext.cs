@@ -1,4 +1,4 @@
-﻿namespace BlazorQuery.Core.BuildingBlocks;
+﻿namespace BlazorQuery.Core;
 
 /// <summary>
 /// Provides context for a query function, including its unique <see cref="QueryKey"/>, 

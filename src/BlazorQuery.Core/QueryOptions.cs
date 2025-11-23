@@ -1,4 +1,4 @@
-﻿namespace BlazorQuery.Core.BuildingBlocks;
+﻿namespace BlazorQuery.Core;
 
 /// <summary>
 /// Provides options for a query.
@@ -11,7 +11,8 @@ public class QueryOptions<T>
         TimeSpan? staleTime = null, 
         NetworkMode networkMode = NetworkMode.Online,
         bool refetchOnReconnect = true,
-        int? retry = null)
+        int? retry = null,
+        IReadOnlyDictionary<string, object>? meta = null)
     {
         QueryKey = queryKey;
         QueryFn = queryFn;
@@ -19,6 +20,7 @@ public class QueryOptions<T>
         NetworkMode = networkMode;
         RefetchOnReconnect = refetchOnReconnect;
         Retry = retry;
+        Meta = meta;
     }
 
     public QueryKey QueryKey { get; init; } = null!;
@@ -27,6 +29,7 @@ public class QueryOptions<T>
     public NetworkMode NetworkMode { get; set; } = NetworkMode.Online;
     public bool RefetchOnReconnect { get; set; } = true;
     public int? Retry { get; init; }
+    public IReadOnlyDictionary<string, object>? Meta { get; init; }
 }
 
 public class QueryOptions : QueryOptions<object?>
@@ -36,7 +39,8 @@ public class QueryOptions : QueryOptions<object?>
                         TimeSpan? staleTime = null,
                         NetworkMode networkMode = NetworkMode.Online,
                         bool refetchOnReconnect = true,
-                        int? retry = null) : base(queryKey, queryFn, staleTime, networkMode, refetchOnReconnect, retry)
+                        int? retry = null,
+                        IReadOnlyDictionary<string, object>? meta = null) : base(queryKey, queryFn, staleTime, networkMode, refetchOnReconnect, retry, meta)
     {
     }
 }

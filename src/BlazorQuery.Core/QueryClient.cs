@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace BlazorQuery.Core.BuildingBlocks;
+namespace BlazorQuery.Core;
 
 /// <summary>
 /// Manages caching, fetching, and invalidation of queries.
