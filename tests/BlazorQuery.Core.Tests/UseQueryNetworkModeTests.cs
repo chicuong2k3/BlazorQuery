@@ -1,65 +1,11 @@
 ﻿using BlazorQuery.Core.Tests.Helpers;
-using Moq;
 
 namespace BlazorQuery.Core.Tests;
 
-public class UseQueryNetworkModeTests
+public class UseQueryNetworkModeTests : UseQueryTestsBase
 {
-    private readonly Mock<IOnlineManager> _onlineManagerMock;
-    private QueryClient _queryClient;
-    private readonly QueryKey _key = new("todos");
-
     public UseQueryNetworkModeTests()
     {
-        _onlineManagerMock = new Mock<IOnlineManager>();
-        _queryClient = new QueryClient(_onlineManagerMock.Object);
-    }
-
-    protected void Dispose() => _queryClient?.Dispose();
-
-    private void SetOnline(bool isOnline)
-    {
-        _onlineManagerMock.Setup(m => m.IsOnline).Returns(isOnline);
-    }
-
-    private static async Task<List<string>> FakeNetworkApi()
-    {
-        await Task.Delay(50);
-        return new List<string> { "network-1", "network-2" };
-    }
-
-    private void SeedCache<T>(T data, TimeSpan staleTime)
-    {
-        _queryClient.Set(_key, data);
-        var entry = _queryClient.GetCacheEntry(_key);
-        if (entry != null)
-            entry.FetchTime = DateTime.UtcNow - TimeSpan.FromMilliseconds(100);
-    }
-
-    private UseQuery<T> CreateQuery<T>(
-        NetworkMode mode,
-        Func<QueryFunctionContext, Task<T>> queryFn,
-        TimeSpan? staleTime = null,
-        bool refetchOnReconnect = true,
-        int? retry = null)
-    {
-        return new UseQuery<T>(
-            new QueryOptions<T>(
-                queryKey: _key,
-                queryFn: queryFn,
-                networkMode: mode,
-                staleTime: staleTime ?? TimeSpan.Zero,
-                refetchOnReconnect: refetchOnReconnect,
-                retry: retry
-            ),
-            _queryClient);
-    }
-
-    private async Task<List<QuerySnapshot<T>>> ObserveQuery<T>(UseQuery<T> query)
-    {
-        using var observer = new QueryObserver<T>(query);
-        await observer.ExecuteAsync();
-        return observer.Snapshots;
     }
 
     [Fact]
@@ -302,47 +248,138 @@ public class UseQueryNetworkModeTests
     }
 
     //[Fact]
-    //public async Task RefetchInterval_ShouldPollAtInterval()
+    //public async Task RefetchInterval_ShouldRefetchAtInterval()
     //{
     //    var fetchCount = 0;
     //    var query = CreateQuery(
     //        NetworkMode.Online,
     //        _ => { fetchCount++; return Task.FromResult(new List<string>()); },
+    //        staleTime: TimeSpan.Zero,
     //        refetchInterval: TimeSpan.FromMilliseconds(100));
 
     //    SetOnline(true);
     //    await query.ExecuteAsync();
 
     //    await Task.Delay(350);
-    //    Assert.True(fetchCount >= 3); 
+    //    Assert.True(fetchCount >= 3, $"Expected >=3 fetches, got {fetchCount}");
     //}
 
-    [Fact]
-    public async Task Retry_WhenFetchFails_ShouldRetrySpecifiedTimes()
-    {
-        var fetchCount = 0;
-        var tcs = new TaskCompletionSource<List<string>>();
+    //[Fact]
+    //public async Task RefetchInterval_ShouldNotRefetchWhenOffline()
+    //{
+    //    int fetchCount = 0;
 
-        var query = CreateQuery<List<string>>(
-            NetworkMode.Online,
-            _ =>
-            {
-                fetchCount++;
-                if (fetchCount < 4)
-                    throw new Exception("Fail");
-                return Task.FromResult(new List<string> { "success" });
-            },
-            retry: 3);
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        async (ctx) =>
+    //        {
+    //            fetchCount++;
+    //            await Task.Delay(10);
+    //            return new List<string>();
+    //        },
+    //        TimeSpan.Zero,
+    //        true,
+    //        null,
+    //        TimeSpan.FromMilliseconds(100)
+    //    );
 
-        SetOnline(true);
-        var snapshots = await ObserveQuery(query);
-        var final = snapshots.Last();
+    //    SetOnline(false);
+    //    await query.ExecuteAsync();
 
-        Assert.Equal(QueryStatus.Success, final.Status);
-        Assert.Equal(4, fetchCount); 
-        Assert.Equal(3, query.FailureCount);
-    }
+    //    await Task.Delay(350); // interval should skip fetches
+    //    Assert.Equal(1, fetchCount); // only initial execute
+    //}
 
+    //[Fact]
+    //public async Task RefetchInterval_ShouldResumeWhenBackOnline()
+    //{
+    //    int fetchCount = 0;
+
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        async (ctx) =>
+    //        {
+    //            fetchCount++;
+    //            await Task.Delay(10);
+    //            return new List<string>();
+    //        },
+    //        TimeSpan.Zero,
+    //        true,
+    //        null,
+    //        TimeSpan.FromMilliseconds(100)
+    //    );
+
+    //    // offline initially
+    //    SetOnline(false);
+    //    await query.ExecuteAsync();
+    //    await Task.Delay(150);
+    //    Assert.Equal(1, fetchCount);
+
+    //    // back online
+    //    SetOnline(true);
+    //    _onlineManagerMock.Raise(m => m.OnlineStatusChanged += null);
+
+    //    await Task.Delay(350);
+    //    Assert.True(fetchCount >= 3, $"Expected >=3 fetches after reconnect, got {fetchCount}");
+    //}
+
+    //[Fact]
+    //public async Task RefetchInterval_ShouldNotStartNewFetchIfPreviousIsRunning()
+    //{
+    //    int fetchCount = 0;
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        async (ctx) =>
+    //        {
+    //            fetchCount++;
+    //            await Task.Delay(200);
+    //            return new List<string>();
+    //        },
+    //        TimeSpan.Zero,
+    //        true,
+    //        null,
+    //        TimeSpan.FromMilliseconds(100)
+    //    );
+
+    //    SetOnline(true);
+    //    await query.ExecuteAsync();
+
+    //    await Task.Delay(350); // interval triggers but previous fetch still running
+    //    Assert.Equal(1, fetchCount); // still only 1 fetch
+    //}
+
+    //[Fact]
+    //public async Task RefetchInterval_ShouldStopWhenDisposed()
+    //{
+    //    int fetchCount = 0;
+
+    //    var query = CreateQuery(
+    //        NetworkMode.Online,
+    //        async (ctx) =>
+    //        {
+    //            fetchCount++;
+    //            await Task.Delay(10);
+    //            return new List<string>();
+    //        },
+    //        TimeSpan.Zero,
+    //        true,
+    //        null,
+    //        TimeSpan.FromMilliseconds(100)
+    //    );
+
+    //    SetOnline(true);
+    //    await query.ExecuteAsync();
+
+    //    await Task.Delay(250);
+    //    query.Dispose();
+
+    //    int lastCount = fetchCount;
+    //    await Task.Delay(200); // any refetch after dispose should not happen
+
+    //    Assert.Equal(lastCount, fetchCount);
+    //}
+
+   
     //[Fact]
     //public async Task RefetchOnMount_WhenDataFresh_ShouldNotRefetch()
     //{

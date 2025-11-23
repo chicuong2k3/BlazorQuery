@@ -43,7 +43,9 @@ public class UseQuery<T> : IDisposable
             Notify();
         }
     }
+
     private Exception? _error;
+    private Exception? _lastError;
     public Exception? Error 
     {
         get => _error;
@@ -72,6 +74,9 @@ public class UseQuery<T> : IDisposable
     public event Action? OnChange;
     private readonly Action _onlineStatusHandler;
     private CancellationTokenSource? _staleTimerCts;
+    private CancellationTokenSource? _refetchIntervalCts;
+
+    private static readonly Random _jitterRandom = new();
 
     public UseQuery(
             QueryOptions<T> queryOptions,
@@ -93,6 +98,10 @@ public class UseQuery<T> : IDisposable
         {
             _onlineManager.OnlineStatusChanged += _onlineStatusHandler;
         }
+
+        // Start interval polling if configured
+        if (_queryOptions.RefetchInterval.HasValue)
+            StartRefetchInterval();
     }
 
     private async Task SafeHandleOnlineStatusChangedAsync()
@@ -120,10 +129,16 @@ public class UseQuery<T> : IDisposable
         var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
                                         (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
 
-        if ((_queryOptions.NetworkMode == NetworkMode.Online && FetchStatus == FetchStatus.Paused) ||
-            (_queryOptions.NetworkMode == NetworkMode.OfflineFirst && (entry == null || isDataStale)))
+        if (FetchStatus == FetchStatus.Paused)
+        {
+            _ = ExecuteAsync(); 
+            return Task.CompletedTask;
+        }
+
+        if (_queryOptions.NetworkMode == NetworkMode.OfflineFirst && isDataStale)
         {
             _ = ExecuteAsync();
+            return Task.CompletedTask;
         }
 
         return Task.CompletedTask;
@@ -132,12 +147,10 @@ public class UseQuery<T> : IDisposable
     /// <summary>
     /// Executes the query manually.
     /// </summary>
-    public async Task ExecuteAsync(CancellationToken? signal = null)
+    public async Task ExecuteAsync(CancellationToken? signal = null, bool isRefetch = false)
     {
         await _fetchLock.WaitAsync();
         CancellationTokenSource? linkedCts = null;
-
-        bool isRefetch = false;
 
         try
         {
@@ -147,8 +160,6 @@ public class UseQuery<T> : IDisposable
             if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
             {
                 _currentCts.Cancel();
-                _currentCts.Dispose();
-                _currentCts = null;
             }
             _currentCts = new CancellationTokenSource();
 
@@ -188,8 +199,8 @@ public class UseQuery<T> : IDisposable
             }
 
             // Background fetch: data exists but stale
-            isRefetch = Data != null && isDataStale;
-            if (isRefetch)
+            bool isBackgroundFetch = !isRefetch && Data != null && isDataStale;
+            if (isBackgroundFetch)
             {
                 IsFetchingBackground = true;
                 Notify();
@@ -197,12 +208,17 @@ public class UseQuery<T> : IDisposable
 
             FetchStatus = FetchStatus.Fetching;
 
-            FailureCount = 0;
-            IsRefetchError = false;
-            Exception? lastError = null;
-            int maxRetries = _queryOptions.Retry ?? 0;
+            if (!isRefetch)
+            {
+                FailureCount = 0;
+                IsRefetchError = false;
+                _lastError = null;
+            }
 
-            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            int maxRetries = _queryOptions.Retry ?? 0;
+            TimeSpan maxRetryDelay = _queryOptions.MaxRetryDelay ?? TimeSpan.FromSeconds(30);
+
+            for (int attempt = 0;; attempt++)
             {
                 try
                 {
@@ -211,13 +227,15 @@ public class UseQuery<T> : IDisposable
                                                     _ => _queryOptions.QueryFn(ctx),
                                                     _queryOptions.StaleTime,
                                                     token);
+
+                    _lastError = null;
                     Error = null;
 
                     if (entry != null)
                         entry.FetchTime = DateTime.UtcNow;
 
                     // start the timer so we refetch automatically when stale
-                    if (isRefetch == false)
+                    if (!isRefetch)
                     {
                         StartStaleTimer();
                     }
@@ -236,17 +254,51 @@ public class UseQuery<T> : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    lastError = ex;
                     FailureCount++;
-                    if (attempt < maxRetries)
+                    _lastError = ex;
+                    bool shouldRetry = false;
+
+                    // infinite retry
+                    if (_queryOptions.RetryInfinite) 
+                        shouldRetry = true;
+                    // retry n times
+                    else if (_queryOptions.Retry.HasValue && attempt < _queryOptions.Retry.Value) 
+                        shouldRetry = true;
+                    // custom retry func
+                    else if (_queryOptions.RetryFunc != null) 
+                        shouldRetry = _queryOptions.RetryFunc(attempt, ex);
+
+                    if (!shouldRetry)
                     {
-                        await Task.Delay((int)Math.Pow(2, attempt) * 1000, token);
+                        Error = _lastError;
+                        if (isRefetch) IsRefetchError = true;
+                        break;
                     }
+
+                    // pause retry if offline
+                    if (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
+                    {
+                        FetchStatus = FetchStatus.Paused;
+                        return;
+                    }
+
+                    // delay before retry
+                    int delayMs; 
+                    if (_queryOptions.RetryDelayFunc != null)
+                    {
+                        delayMs = (int)_queryOptions.RetryDelayFunc(attempt).TotalMilliseconds;
+                    }
+                    else
+                    {
+                        double expDelay = Math.Pow(2, attempt) * 1000; 
+                        double jitter = _jitterRandom.NextDouble() * 300; 
+                        delayMs = (int)Math.Min(expDelay + jitter, maxRetryDelay.TotalMilliseconds);
+                    }
+
+                    await Task.Delay(delayMs, token);
                 }
             }
 
-            Error = lastError;
-            IsRefetchError = isRefetch;
         }
         finally
         {
@@ -262,13 +314,14 @@ public class UseQuery<T> : IDisposable
 
             linkedCts?.Dispose();
             _fetchLock.Release();
+            OnChange?.Invoke();
         }
     }
 
     public async Task RefetchAsync(CancellationToken? signal = null)
     {
         _client.Invalidate(_queryOptions.QueryKey);
-        await ExecuteAsync(signal).ConfigureAwait(false);
+        await ExecuteAsync(signal, isRefetch: true).ConfigureAwait(false);
     }
 
     private void Notify() => OnChange?.Invoke();
@@ -282,14 +335,11 @@ public class UseQuery<T> : IDisposable
             {
                 _currentCts.Cancel();
             }
-            finally
-            {
-                _currentCts.Dispose();
-                _currentCts = null;
-            }
+            catch { }
         }
 
         FetchStatus = FetchStatus.Paused;
+        OnChange?.Invoke();
     }
 
     /// <summary>
@@ -322,9 +372,31 @@ public class UseQuery<T> : IDisposable
                     {
                         IsFetchingBackground = true;
                         Notify();
-                        _ = ExecuteAsync();
+                        _ = ExecuteAsync(isRefetch: true);
                     }
                 }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    private void StartRefetchInterval()
+    {
+        if (!_queryOptions.RefetchInterval.HasValue) return;
+
+        _refetchIntervalCts = new CancellationTokenSource();
+        var interval = _queryOptions.RefetchInterval.Value;
+
+        _ = Task.Run(async () =>
+        {
+            while (!_refetchIntervalCts.IsCancellationRequested)
+            {
+                await Task.Delay(interval, _refetchIntervalCts.Token);
+                if (_refetchIntervalCts.IsCancellationRequested) break;
+
+                if (_onlineManager.IsOnline && FetchStatus != FetchStatus.Fetching)
+                {
+                    _ = ExecuteAsync(isRefetch: Data != null);
+                }
+            }
+        }, _refetchIntervalCts.Token);
     }
 
     public void Dispose()
@@ -338,6 +410,13 @@ public class UseQuery<T> : IDisposable
 
         _currentCts?.Cancel();
         _currentCts?.Dispose();
+
+        _staleTimerCts?.Cancel();
+        _staleTimerCts?.Dispose();
+
+        _refetchIntervalCts?.Cancel();
+        _refetchIntervalCts?.Dispose();
+
         _fetchLock.Dispose();
     }
 
