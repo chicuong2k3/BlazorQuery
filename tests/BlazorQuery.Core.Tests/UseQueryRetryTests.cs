@@ -95,25 +95,32 @@ public class UseQueryRetryTests : UseQueryTestsBase
     [Fact]
     public async Task Refetch_WithRetry_ShouldMarkRefetchError()
     {
-        int count = 0; 
+        int count = 0;
         var query = CreateQuery(
-            NetworkMode.Online, 
-            _ => { 
-                count++; 
-                if (count < 2) 
-                    throw new Exception("Fail"); 
-                
-                return Task.FromResult(new List<string> { "ok" }); 
-            }, 
-            retry: 1
-        ); 
-        
-        SetOnline(true); 
-        await query.ExecuteAsync(); 
-        await query.RefetchAsync(); 
-        Assert.True(query.IsRefetchError); 
-        Assert.NotNull(query.Error); 
-        Assert.Equal(2, count); 
+            NetworkMode.Online,
+            _ =>
+            {
+                count++;
+                if (count == 1) 
+                    return Task.FromResult(new List<string> { "ok" });
+
+                throw new Exception("Fail");
+            },
+            retry: 0
+        );
+
+        SetOnline(true);
+
+        await ObserveQuery(query);
+
+        var snapshots = await ObserveRefetchQuery(query);
+        var refetchErrorSnapshot = snapshots.FirstOrDefault(s => s.IsRefetchError);
+
+        Assert.NotNull(refetchErrorSnapshot); 
+        Assert.True(refetchErrorSnapshot.IsRefetchError);
+        Assert.NotNull(refetchErrorSnapshot.Error);
+
+        Assert.Equal(2, count);
     } 
     
     [Fact] 
@@ -137,37 +144,31 @@ public class UseQueryRetryTests : UseQueryTestsBase
 
         await Assert.ThrowsAsync<TaskCanceledException>(() => task);
         Assert.True(count < 6); // should not complete all retries
-    } 
-    
-    //[Fact] 
-    //public async Task Retry_ShouldPauseWhenOffline() 
-    //{ 
-    //    int count = 0; 
-    //    var query = CreateQuery(
-    //        NetworkMode.Online, 
-    //        async _ => { 
-    //            count++; 
-    //            return new List<string> { "ok" }; 
-    //        }, 
-    //        retry: 3
-    //    ); 
-        
-    //    SetOnline(false); 
-    //    var task = query.ExecuteAsync(); 
-    //    await Task.Delay(20); 
-        
-    //    Assert.Equal(FetchStatus.Paused, query.FetchStatus);
+    }
 
-    //    var tcs = new TaskCompletionSource();
-    //    query.OnChange += () =>
-    //    {
-    //        if (query.Status == QueryStatus.Success)
-    //            tcs.TrySetResult();
-    //    };
+    [Fact]
+    public async Task Retry_ShouldPauseWhenOffline()
+    {
+        int count = 0;
+        var query = CreateQuery(
+            NetworkMode.Online,
+            async _ =>
+            {
+                count++;
+                return new List<string> { "ok" };
+            },
+            retry: 3
+        );
 
-    //    SetOnline(true);
-    //    await tcs.Task;
-    //    Assert.Equal(QueryStatus.Success, query.Status); 
-    //}
-    
+        SetOnline(false);
+        var snapshots = await ObserveQuery(query);
+        Assert.Contains(snapshots, s => s.FetchStatus == FetchStatus.Paused);
+
+        SetOnline(true);
+        snapshots = await ObserveQuery(query);
+        Assert.Contains(snapshots, s => s.Status == QueryStatus.Success);
+
+        Assert.Equal(1, count);
+    }
+
 }

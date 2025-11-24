@@ -68,4 +68,11 @@ public class UseQueryTestsBase
         await observer.ExecuteAsync();
         return observer.Snapshots;
     }
+
+    protected async Task<List<QuerySnapshot<T>>> ObserveRefetchQuery<T>(UseQuery<T> query)
+    {
+        using var observer = new QueryObserver<T>(query);
+        await observer.RefetchAsync();
+        return observer.Snapshots;
+    }
 }

@@ -22,7 +22,8 @@ public class QueryObserver<T> : IDisposable
             FetchStatus = _query.FetchStatus,
             Status = _query.Status,
             IsLoading = _query.IsLoading,
-            IsFetchingBackground = _query.IsFetchingBackground
+            IsFetchingBackground = _query.IsFetchingBackground,
+            IsRefetchError = _query.IsRefetchError
         });
 
         _tcs?.TrySetResult(true); 
@@ -31,6 +32,14 @@ public class QueryObserver<T> : IDisposable
     public async Task ExecuteAsync(int waitMs = 0)
     {
         await _query.ExecuteAsync();
+        Capture();
+        if (waitMs > 0)
+            await Task.Delay(waitMs);
+    }
+
+    public async Task RefetchAsync(int waitMs = 0)
+    {
+        await _query.RefetchAsync();
         Capture();
         if (waitMs > 0)
             await Task.Delay(waitMs);
