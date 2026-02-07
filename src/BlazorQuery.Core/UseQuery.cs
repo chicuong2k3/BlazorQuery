@@ -73,6 +73,12 @@ public class UseQuery<T> : IDisposable
     public bool IsFetchingBackground { get; private set; }
     public bool IsLoading => Status == QueryStatus.Pending && 
                              (FetchStatus == FetchStatus.Fetching || FetchStatus == FetchStatus.Paused);
+    
+    public bool IsPending => Status == QueryStatus.Pending;
+    public bool IsSuccess => Status == QueryStatus.Success;
+    public bool IsError => Status == QueryStatus.Error;
+    public bool IsFetching => FetchStatus == FetchStatus.Fetching;
+    public bool IsPaused => FetchStatus == FetchStatus.Paused;
 
     public int FailureCount { get; private set; }
     public bool IsRefetchError { get; private set; }
@@ -299,13 +305,15 @@ public class UseQuery<T> : IDisposable
                 }
                 catch (OperationCanceledException)
                 {
-                    if (_queryOptions.NetworkMode != NetworkMode.Always)
+                    // Only pause if we're offline (cancellation was due to going offline)
+                    // If still online, this is a user cancellation - rethrow
+                    if (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
                     {
                         FetchStatus = FetchStatus.Paused;
                         IsFetchingBackground = false;
                         return;
                     }
-                    throw; 
+                    throw;
                 }
                 catch (Exception ex)
                 {
