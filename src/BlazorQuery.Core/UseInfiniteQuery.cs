@@ -289,8 +289,12 @@ public class UseInfiniteQuery<TData, TPageParam> : IDisposable
             var newPages = new List<TData>();
             var newPageParams = new List<object?>();
 
+            // Create a copy of page params to iterate over
+            // This prevents potential modification during enumeration issues
+            var pageParamsToRefetch = new List<object?>(_data.PageParams);
+
             // Refetch each page sequentially using stored page params
-            foreach (var pageParam in _data.PageParams)
+            foreach (var pageParam in pageParamsToRefetch)
             {
                 var ctx = new QueryFunctionContext(_options.QueryKey, cancellationToken ?? CancellationToken.None, _options.Meta);
                 var page = await _options.QueryFn(ctx, (TPageParam)pageParam!);

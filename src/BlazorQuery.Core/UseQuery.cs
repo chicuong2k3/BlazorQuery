@@ -326,6 +326,11 @@ public class UseQuery<T> : IDisposable
             Data = initialData;
             IsPlaceholderData = false;
             
+            // Note: Status is automatically computed based on Data and Error
+            // Since Data is set and Error is null:
+            //   Status = Success (computed property)
+            //   FetchStatus = Idle (already set in constructor)
+            
             // Note: Staleness checking happens in ExecuteAsync
             // If (UtcNow - entry.FetchTime) > staleTime: will refetch
             // If (UtcNow - entry.FetchTime) <= staleTime: won't refetch (still fresh)
@@ -354,7 +359,11 @@ public class UseQuery<T> : IDisposable
             Data = placeholderData;
             IsPlaceholderData = true;
             
-            // Note: Query will still fetch actual data in background
+            // Note: Status is automatically computed based on Data and Error
+            // Since Data is set and Error is null:
+            //   Status = Success (computed property)
+            //   FetchStatus = Idle (already set in constructor)
+            // Query will still fetch actual data in background
             // When real data arrives, IsPlaceholderData will become false
         }
     }
