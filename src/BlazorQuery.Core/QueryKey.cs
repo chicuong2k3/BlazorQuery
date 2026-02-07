@@ -67,6 +67,24 @@ public class QueryKey : IEquatable<QueryKey>
     public override string ToString() 
         => $"QueryKey({string.Join(", ", Parts.Select(PartToString))})";
 
+    /// <summary>
+    /// Checks if this query key starts with the specified prefix key.
+    /// Used for prefix matching in query invalidation.
+    /// </summary>
+    public bool StartsWith(QueryKey prefix)
+    {
+        if (prefix.Parts.Count > Parts.Count) return false;
+        
+        // Check if all prefix parts match
+        for (var i = 0; i < prefix.Parts.Count; i++)
+        {
+            if (!PartEquals(Parts[i], prefix.Parts[i]))
+                return false;
+        }
+        
+        return true;
+    }
+
     private static bool PartEquals(object? a, object? b)
     {
         if (ReferenceEquals(a, b)) return true;

@@ -7,8 +7,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_ShouldFetchFirstPage()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => {
                     await Task.Delay(10);
@@ -31,8 +31,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_ShouldFetchNextPage()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0,
@@ -54,8 +54,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_HasNextPage_ShouldBeTrue()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0,
@@ -72,8 +72,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_HasNextPage_ShouldBeFalse_WhenNoMore()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0,
@@ -94,8 +94,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_ShouldNotFetchNextPage_WhenNoMore()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0,
@@ -124,8 +124,8 @@ public class InfiniteQueryTests : IDisposable
     {
         var tcs = new TaskCompletionSource<ProjectsPage>();
         
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => {
                     if (pageParam == 0)
@@ -156,8 +156,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_ShouldFetchPreviousPage()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 3, // Start from page 1
@@ -179,8 +179,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_HasPreviousPage_ShouldWork()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 3, // Start from page 1
@@ -202,8 +202,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_MaxPages_ShouldLimitPageCount()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0,
@@ -228,8 +228,8 @@ public class InfiniteQueryTests : IDisposable
     {
         var fetchCount = 0;
         
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => {
                     fetchCount++;
@@ -255,8 +255,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_WithoutGetNextPageParam_HasNextPage_ShouldBeFalse()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0
@@ -276,8 +276,8 @@ public class InfiniteQueryTests : IDisposable
         var delayTcs = new TaskCompletionSource<ProjectsPage>();
         var fetchCount = 0;
         
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => {
                     fetchCount++;
@@ -312,8 +312,8 @@ public class InfiniteQueryTests : IDisposable
     [Fact]
     public async Task InfiniteQuery_DataStructure_ShouldMatchExpectedFormat()
     {
-        var query = new UseInfiniteQuery<ProjectsPage, int>(
-            new InfiniteQueryOptions<ProjectsPage, int>(
+        var query = new UseInfiniteQuery<ProjectsPage, int?>(
+            new InfiniteQueryOptions<ProjectsPage, int?>(
                 queryKey: new QueryKey("projects"),
                 queryFn: async (ctx, pageParam) => FetchProjectsPage(pageParam),
                 initialPageParam: 0,
@@ -334,7 +334,7 @@ public class InfiniteQueryTests : IDisposable
     public void Dispose() => _client?.Dispose();
 
     // Helper methods
-    private static ProjectsPage FetchProjectsPage(int cursor)
+    private static ProjectsPage FetchProjectsPage(int? cursor)
     {
         var pages = new Dictionary<int, ProjectsPage>
         {
@@ -374,7 +374,7 @@ public class InfiniteQueryTests : IDisposable
             }
         };
 
-        return pages[cursor];
+        return pages[cursor ?? 0];
     }
 
     // Helper classes

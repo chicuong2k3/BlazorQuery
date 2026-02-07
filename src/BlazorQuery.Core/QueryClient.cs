@@ -166,6 +166,66 @@ public class QueryClient : IDisposable
     public void SetQueryData<T>(QueryKey key, T value) => Set(key, value);
 
     /// <summary>
+    /// Invalidates queries matching the filters.
+    /// Marks them as stale and triggers refetch if they are currently active.
+    /// </summary>
+    /// <param name="filters">Optional filters to match specific queries. If null, invalidates all queries.</param>
+    public void InvalidateQueries(QueryFilters? filters = null)
+    {
+        filters ??= new QueryFilters(); // Match all if no filters
+
+        // Find all matching cache entries
+        var keysToInvalidate = _cache.Keys
+            .Where(key => filters.Matches(key))
+            .ToList();
+
+        foreach (var key in keysToInvalidate)
+        {
+            if (_cache.TryGetValue(key, out var entry))
+            {
+                // Mark as stale by setting FetchTime to distant past
+                // This overrides any staleTime configuration
+                entry.FetchTime = DateTime.MinValue;
+            }
+        }
+
+        // Fire event for invalidated queries (for active queries to refetch)
+        OnQueriesInvalidated?.Invoke(keysToInvalidate);
+    }
+
+    /// <summary>
+    /// Event fired when queries are invalidated.
+    /// Active queries can subscribe to refetch themselves.
+    /// </summary>
+    public event Action<List<QueryKey>>? OnQueriesInvalidated;
+
+    /// <summary>
+    /// Event fired when queries are cancelled.
+    /// Active queries can subscribe to handle cancellation.
+    /// </summary>
+    public event Action<List<QueryKey>>? OnQueriesCancelled;
+
+    /// <summary>
+    /// Cancels queries matching the filters.
+    /// Cancels ongoing fetches and optionally reverts state.
+    /// </summary>
+    /// <param name="filters">Optional filters to match specific queries. If null, cancels all queries.</param>
+    /// <param name="options">Cancellation options (silent, revert).</param>
+    public void CancelQueries(QueryFilters? filters = null, CancelOptions? options = null)
+    {
+        filters ??= new QueryFilters(); // Match all if no filters
+        options ??= new CancelOptions();
+
+        // Find all matching cache entries
+        var keysToCancel = _cache.Keys
+            .Where(key => filters.Matches(key))
+            .ToList();
+
+        // Fire event for cancelled queries (for active queries to cancel themselves)
+        OnQueriesCancelled?.Invoke(keysToCancel);
+    }
+
+    /// <summary>
     /// Internal: Increment global fetching counter.
     /// Called by UseQuery when a fetch starts.
     /// </summary>

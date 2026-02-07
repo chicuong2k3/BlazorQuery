@@ -29,6 +29,9 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [12. Placeholder Query Data](./12.%20Placeholder%20Query%20Data.md) - Show preview data while fetching actual data
 - [13. Paginated Queries](./13.%20Paginated%20Queries.md) - Smooth pagination without loading flicker
 - [14. Infinite Queries](./14.%20Infinite%20Queries.md) - Load more and infinite scroll patterns
+- [15. Query Invalidation](./15.%20Query%20Invalidation.md) - Invalidate and refetch queries on demand
+- [16. Filters](./16.%20Filters.md) - Advanced query filtering and matching
+- [17. Query Cancellation](./17.%20Query%20Cancellation.md) - Cancel ongoing queries with CancellationToken
 
 ## 🚀 Quick Start
 

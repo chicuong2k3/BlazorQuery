@@ -152,12 +152,39 @@ public class UseQuery<T> : IDisposable
             _client.FocusManager.FocusChanged += _focusChangedHandler;
         }
 
+        // Subscribe to query invalidation events
+        _client.OnQueriesInvalidated += HandleQueriesInvalidated;
+        
+        // Subscribe to query cancellation events
+        _client.OnQueriesCancelled += HandleQueriesCancelled;
+
         // Handle initial data and placeholder data
         InitializeWithData();
 
         // Start interval polling if configured
         if (_queryOptions.RefetchInterval.HasValue)
             StartRefetchInterval();
+    }
+
+    private void HandleQueriesInvalidated(List<QueryKey> invalidatedKeys)
+    {
+        // Check if this query was invalidated
+        if (!invalidatedKeys.Contains(_queryOptions.QueryKey)) return;
+        // Refetch if this query is enabled
+        if (_queryOptions.Enabled)
+        {
+            _ = ExecuteAsync();
+        }
+    }
+
+    private void HandleQueriesCancelled(List<QueryKey> cancelledKeys)
+    {
+        // Check if this query should be cancelled
+        if (cancelledKeys.Contains(_queryOptions.QueryKey))
+        {
+            // Cancel the current fetch
+            _currentCts?.Cancel();
+        }
     }
 
     private void InitializeWithData()
@@ -689,6 +716,12 @@ public class UseQuery<T> : IDisposable
             
             if (_queryOptions.RefetchOnWindowFocus)
                 _client.FocusManager.FocusChanged -= _focusChangedHandler;
+            
+            // Unsubscribe from invalidation events
+            _client.OnQueriesInvalidated -= HandleQueriesInvalidated;
+            
+            // Unsubscribe from cancellation events
+            _client.OnQueriesCancelled -= HandleQueriesCancelled;
         }
         catch
         {
