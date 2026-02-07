@@ -416,7 +416,7 @@ public class UseQuery<T> : IDisposable
 
         try
         {
-            await _staleTimerCts?.CancelAsync()!;
+            _staleTimerCts?.Cancel();
 
             // Cancel _currentCts only if a fetch is already running
             if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
@@ -603,7 +603,7 @@ public class UseQuery<T> : IDisposable
                         // If disposed, semaphore.Dispose() will interrupt this wait
                         try
                         {
-                            await _pauseRetrySemaphore.WaitAsync(token);
+                            await _pauseRetrySemaphore.WaitAsync();
                         }
                         catch (ObjectDisposedException)
                         {

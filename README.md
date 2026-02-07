@@ -34,6 +34,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [17. Query Cancellation](./17.%20Query%20Cancellation.md) - Cancel ongoing queries with CancellationToken
 - [18. Scroll Restoration](./18.%20Scroll%20Restoration.md) - Automatic scroll position preservation
 - [19. Default Query Function](./19.%20Default%20Query%20Function.md) - Shared query function for entire app
+- [20. Render Optimizations](./20.%20Render%20Optimizations.md) - Optimize component re-rendering performance
 
 ## 🚀 Quick Start
 

@@ -98,7 +98,7 @@ public class QueryInvalidationTests : IDisposable
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos"),
-                queryFn: async _ => { fetchCount1++; return "Todos"; },
+                queryFn: _ => { fetchCount1++; return Task.FromResult("Todos"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -107,7 +107,7 @@ public class QueryInvalidationTests : IDisposable
         var query2 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos", 1),
-                queryFn: async _ => { fetchCount2++; return "Todo 1"; },
+                queryFn: _ => { fetchCount2++; return Task.FromResult("Todo 1"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -116,7 +116,7 @@ public class QueryInvalidationTests : IDisposable
         var query3 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("users"),
-                queryFn: async _ => { fetchCount3++; return "Users"; },
+                queryFn: _ => { fetchCount3++; return Task.FromResult("Users"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -151,7 +151,7 @@ public class QueryInvalidationTests : IDisposable
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos"),
-                queryFn: async _ => { fetchCount1++; return "Todos"; },
+                queryFn: _ => { fetchCount1++; return Task.FromResult("Todos"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -160,7 +160,7 @@ public class QueryInvalidationTests : IDisposable
         var query2 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos", 1),
-                queryFn: async _ => { fetchCount2++; return "Todo 1"; },
+                queryFn: _ => { fetchCount2++; return Task.FromResult("Todo 1"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -195,7 +195,7 @@ public class QueryInvalidationTests : IDisposable
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos", new { version = 5 }),
-                queryFn: async _ => { fetchCount1++; return "Todo v5"; },
+                queryFn: _ => { fetchCount1++; return Task.FromResult("Todo v5"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -204,7 +204,7 @@ public class QueryInvalidationTests : IDisposable
         var query2 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos", new { version = 10 }),
-                queryFn: async _ => { fetchCount2++; return "Todo v10"; },
+                queryFn: _ => { fetchCount2++; return Task.FromResult("Todo v10"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -213,7 +213,7 @@ public class QueryInvalidationTests : IDisposable
         var query3 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos", new { version = 20 }),
-                queryFn: async _ => { fetchCount3++; return "Todo v20"; },
+                queryFn: _ => { fetchCount3++; return Task.FromResult("Todo v20"); },
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -362,6 +362,7 @@ public class QueryInvalidationTests : IDisposable
     public async Task InvalidateQueries_MultipleQueries_ShouldInvalidateCorrectOnes()
     {
         var queries = new List<(UseQuery<string> query, int id)>();
+        if (queries == null) throw new ArgumentNullException(nameof(queries));
         var fetchCounts = new Dictionary<int, int>();
 
         // Create multiple queries
@@ -400,7 +401,6 @@ public class QueryInvalidationTests : IDisposable
 
         await Task.Delay(150);
 
-        // Only todo 2 should refetch
         Assert.Equal(0, fetchCounts[0]);
         Assert.Equal(0, fetchCounts[1]);
         Assert.Equal(1, fetchCounts[2]); // Only this one
@@ -420,7 +420,7 @@ public class QueryInvalidationTests : IDisposable
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos"),
-                queryFn: async _ => "Todos",
+                queryFn: _ => Task.FromResult("Todos"),
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -429,7 +429,7 @@ public class QueryInvalidationTests : IDisposable
         var query2 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("todos", 1),
-                queryFn: async _ => "Todo 1",
+                queryFn: _ => Task.FromResult("Todo 1"),
                 staleTime: TimeSpan.FromHours(1)
             ),
             _client
@@ -451,6 +451,6 @@ public class QueryInvalidationTests : IDisposable
         Assert.Contains(new QueryKey("todos", 1), capturedKeys);
     }
 
-    public void Dispose() => _client?.Dispose();
+    public void Dispose() => _client.Dispose();
 }
 
