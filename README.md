@@ -15,6 +15,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 
 ## 📚 Documentation
 
+- [⚠️ Important Defaults](./21.%20Important%20Defaults.md) - **Start here!** Understand default behaviors
 - [1. Query Keys](./1.%20Query%20Keys.md) - Learn about query identification and caching
 - [2. Query Functions](./2.%20Query%20Functions.md) - Define your data fetching logic
 - [3. Network Mode](./3.%20Network%20Mode.md) - Handle online/offline scenarios
