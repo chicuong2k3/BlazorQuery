@@ -19,7 +19,8 @@ public class QueryOptions<T>
         Func<int, TimeSpan>? retryDelayFunc = null,
         TimeSpan? refetchInterval = null,
         IReadOnlyDictionary<string, object>? meta = null,
-        bool enabled = true)
+        bool enabled = true,
+        bool refetchOnWindowFocus = true)
     {
         QueryKey = queryKey;
         QueryFn = queryFn;
@@ -35,6 +36,7 @@ public class QueryOptions<T>
         RefetchInterval = refetchInterval;
         Meta = meta;
         Enabled = enabled;
+        RefetchOnWindowFocus = refetchOnWindowFocus;
     }
 
     public QueryKey QueryKey { get; init; } = null!;
@@ -51,6 +53,7 @@ public class QueryOptions<T>
     public TimeSpan? RefetchInterval { get; init; }
     public IReadOnlyDictionary<string, object>? Meta { get; init; }
     public bool Enabled { get; set; } = true;
+    public bool RefetchOnWindowFocus { get; set; } = true;
 }
 
 public class QueryOptions : QueryOptions<object?>
@@ -68,7 +71,8 @@ public class QueryOptions : QueryOptions<object?>
                         Func<int, TimeSpan>? retryDelayFunc = null,
                         TimeSpan? refetchInterval = null,
                         IReadOnlyDictionary<string, object>? meta = null,
-                        bool enabled = true) : base(
+                        bool enabled = true,
+                        bool refetchOnWindowFocus = true) : base(
                             queryKey,
                             queryFn,
                             staleTime,
@@ -82,7 +86,8 @@ public class QueryOptions : QueryOptions<object?>
                             retryDelayFunc,
                             refetchInterval,
                             meta,
-                            enabled)
+                            enabled,
+                            refetchOnWindowFocus)
     {
     }
 }

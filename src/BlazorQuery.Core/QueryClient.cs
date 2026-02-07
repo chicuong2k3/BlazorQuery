@@ -9,6 +9,13 @@ public class QueryClient : IDisposable
 {
     public NetworkMode DefaultNetworkMode { get; set; } = NetworkMode.Online;
     public IOnlineManager OnlineManager { get; private set; }
+    public IFocusManager FocusManager { get; private set; }
+    
+    /// <summary>
+    /// Default value for refetchOnWindowFocus option.
+    /// Can be overridden per-query.
+    /// </summary>
+    public bool DefaultRefetchOnWindowFocus { get; set; } = true;
     
     private int _fetchingQueriesCount = 0;
     
@@ -33,14 +40,18 @@ public class QueryClient : IDisposable
     private readonly ConcurrentDictionary<QueryKey, CacheEntry> _cache = new();
 
     /// <summary>
-    /// Creates a new QueryClient with optional network awareness.
+    /// Creates a new QueryClient with optional network and focus awareness.
     /// </summary>
     /// <param name="onlineManager">
     /// Optional. Defaults to in-memory manager if not provided.
     /// </param>
-    public QueryClient(IOnlineManager? onlineManager = null)
+    /// <param name="focusManager">
+    /// Optional. Defaults to DefaultFocusManager if not provided.
+    /// </param>
+    public QueryClient(IOnlineManager? onlineManager = null, IFocusManager? focusManager = null)
     {
         OnlineManager = onlineManager ?? new DefaultOnlineManager();
+        FocusManager = focusManager ?? new DefaultFocusManager();
         DefaultNetworkMode = NetworkMode.Online;
     }
 

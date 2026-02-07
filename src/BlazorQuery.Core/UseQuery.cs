@@ -92,6 +92,7 @@ public class UseQuery<T> : IDisposable
 
     public event Action? OnChange;
     private readonly Action _onlineStatusHandler;
+    private readonly Action<bool> _focusChangedHandler;
     private CancellationTokenSource? _staleTimerCts;
     private CancellationTokenSource? _refetchIntervalCts;
     
@@ -118,9 +119,27 @@ public class UseQuery<T> : IDisposable
 
         _onlineStatusHandler = () => _ = SafeHandleOnlineStatusChangedAsync();
 
-        if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
+        if (_queryOptions.RefetchOnReconnect)
         {
             _onlineManager.OnlineStatusChanged += _onlineStatusHandler;
+        }
+
+        // Subscribe to focus changes for refetchOnWindowFocus
+        _focusChangedHandler = async void (isFocused) =>
+        {
+            try
+            {
+                await HandleFocusChangedAsync(isFocused);
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+        };
+        
+        if (_queryOptions.RefetchOnWindowFocus)
+        {
+            _client.FocusManager.FocusChanged += _focusChangedHandler;
         }
 
         // Start interval polling if configured
@@ -203,6 +222,32 @@ public class UseQuery<T> : IDisposable
         return Task.CompletedTask;
     }
 
+    private async Task HandleFocusChangedAsync(bool isFocused)
+    {
+        // Only refetch when window gains focus (not when losing focus)
+        if (!isFocused)
+            return;
+
+        // Don't refetch if query is disabled
+        if (!_queryOptions.Enabled)
+            return;
+
+        // Don't refetch if already fetching
+        if (FetchStatus == FetchStatus.Fetching)
+            return;
+
+        // Check if data is stale
+        var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
+        var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
+                                        (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
+
+        // Only refetch if data is stale
+        if (isDataStale)
+        {
+            await ExecuteAsync();
+        }
+    }
+
     /// <summary>
     /// Executes the query manually.
     /// </summary>
@@ -220,12 +265,12 @@ public class UseQuery<T> : IDisposable
 
         try
         {
-            _staleTimerCts?.Cancel();
+            await _staleTimerCts?.CancelAsync()!;
 
             // Cancel _currentCts only if a fetch is already running
             if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
             {
-                _currentCts.Cancel();
+                await _currentCts.CancelAsync();
             }
             _currentCts = new CancellationTokenSource();
 
@@ -240,7 +285,7 @@ public class UseQuery<T> : IDisposable
             var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
 
             // Optimistically set data from cache if it exists
-            if (entry != null && entry.Data is T cached)
+            if (entry is { Data: T cached })
             {
                 Data = cached;
             }
@@ -399,7 +444,7 @@ public class UseQuery<T> : IDisposable
                         // If disposed, semaphore.Dispose() will interrupt this wait
                         try
                         {
-                            await _pauseRetrySemaphore.WaitAsync();
+                            await _pauseRetrySemaphore.WaitAsync(token);
                         }
                         catch (ObjectDisposedException)
                         {
@@ -408,7 +453,7 @@ public class UseQuery<T> : IDisposable
                         }
 
                         // Check if user cancelled while we were paused
-                        if (signal.HasValue && signal.Value.IsCancellationRequested)
+                        if (signal is { IsCancellationRequested: true })
                         {
                             FetchStatus = FetchStatus.Paused;
                             return;
@@ -496,7 +541,7 @@ public class UseQuery<T> : IDisposable
     /// </summary>
     private void StartStaleTimer()
     {
-        if (_staleTimerCts != null && !_staleTimerCts.IsCancellationRequested)
+        if (_staleTimerCts is { IsCancellationRequested: false })
             return;
 
         // Cancel any previous timer to prevent overlapping refetches
@@ -553,6 +598,9 @@ public class UseQuery<T> : IDisposable
         {
             if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
                 _onlineManager.OnlineStatusChanged -= _onlineStatusHandler;
+            
+            if (_queryOptions.RefetchOnWindowFocus)
+                _client.FocusManager.FocusChanged -= _focusChangedHandler;
         }
         catch
         {

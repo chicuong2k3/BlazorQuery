@@ -10,7 +10,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("test"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(100);
                     return "Data";
                 }
@@ -44,7 +44,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("test"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(50);
                     return "Data";
                 },
@@ -78,9 +78,10 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
     }
 
     [Fact]
-    public async Task GlobalIsFetching_ShouldBeFalseInitially()
+    public Task GlobalIsFetching_ShouldBeFalseInitially()
     {
         Assert.False(_client.IsFetching);
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -89,7 +90,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("query1"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(100);
                     return "Data 1";
                 }
@@ -100,7 +101,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query2 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("query2"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(100);
                     return "Data 2";
                 }
@@ -145,7 +146,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
             new UseQuery<string>(
                 new QueryOptions<string>(
                     queryKey: new QueryKey("query", i),
-                    queryFn: async ctx => {
+                    queryFn: async _ => {
                         await Task.Delay(50);
                         return $"Data {i}";
                     }
@@ -182,7 +183,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("test"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(50);
                     return "Data";
                 }
@@ -210,7 +211,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("query1"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(100);
                     return "Data 1";
                 }
@@ -221,7 +222,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query2 = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("query2"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(150);
                     return "Data 2";
                 }
@@ -260,7 +261,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("test"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(50);
                     return "Data";
                 }
@@ -288,7 +289,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("test"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(50);
                     throw new Exception("Fetch failed");
                 },
@@ -312,7 +313,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("test"),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(50);
                     return "Data";
                 },
@@ -335,7 +336,7 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         var queryOptions = Enumerable.Range(1, 3).Select(i =>
             new QueryOptions<string>(
                 queryKey: new QueryKey("item", i),
-                queryFn: async ctx => {
+                queryFn: async _ => {
                     await Task.Delay(50);
                     return $"Item {i}";
                 }
@@ -358,9 +359,6 @@ public class BackgroundFetchingIndicatorsTests : IDisposable
         Assert.False(_client.IsFetching);
     }
 
-    public void Dispose()
-    {
-        _client?.Dispose();
-    }
+    public void Dispose() => _client?.Dispose();
 }
 
