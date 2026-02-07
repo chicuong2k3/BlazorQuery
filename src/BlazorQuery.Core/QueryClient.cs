@@ -9,6 +9,19 @@ public class QueryClient : IDisposable
 {
     public NetworkMode DefaultNetworkMode { get; set; } = NetworkMode.Online;
     public IOnlineManager OnlineManager { get; private set; }
+    
+    private int _fetchingQueriesCount = 0;
+    
+    /// <summary>
+    /// Indicates if any queries are currently fetching (including background fetches).
+    /// </summary>
+    public bool IsFetching => _fetchingQueriesCount > 0;
+    
+    /// <summary>
+    /// Event fired when global fetching state changes.
+    /// </summary>
+    public event Action? OnFetchingChanged;
+    
     public class CacheEntry
     {
         public object? Data { get; set; }
@@ -117,6 +130,36 @@ public class QueryClient : IDisposable
     {
         _cache.TryGetValue(key, out var entry);
         return entry;
+    }
+
+    /// <summary>
+    /// Internal: Increment global fetching counter.
+    /// Called by UseQuery when a fetch starts.
+    /// </summary>
+    internal void IncrementFetchingQueries()
+    {
+        var wasFetching = IsFetching;
+        Interlocked.Increment(ref _fetchingQueriesCount);
+        
+        if (!wasFetching && IsFetching)
+        {
+            OnFetchingChanged?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Internal: Decrement global fetching counter.
+    /// Called by UseQuery when a fetch completes.
+    /// </summary>
+    internal void DecrementFetchingQueries()
+    {
+        var wasFetching = IsFetching;
+        Interlocked.Decrement(ref _fetchingQueriesCount);
+        
+        if (wasFetching && !IsFetching)
+        {
+            OnFetchingChanged?.Invoke();
+        }
     }
 
     public void Dispose()

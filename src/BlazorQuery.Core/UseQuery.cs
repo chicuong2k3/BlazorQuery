@@ -273,6 +273,7 @@ public class UseQuery<T> : IDisposable
             }
 
             FetchStatus = FetchStatus.Fetching;
+            _client.IncrementFetchingQueries(); // Track global fetching state
 
             if (!isRefetch)
             {
@@ -453,6 +454,7 @@ public class UseQuery<T> : IDisposable
             if (FetchStatus != FetchStatus.Paused)
             {
                 FetchStatus = FetchStatus.Idle;
+                _client.DecrementFetchingQueries(); // Track global fetching state
             }
 
             linkedCts?.Dispose();
