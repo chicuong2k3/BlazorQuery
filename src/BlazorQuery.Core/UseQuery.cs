@@ -58,15 +58,23 @@ public class UseQuery<T> : IDisposable
         }
     }
 
-    public QueryStatus Status => Error != null
-            ? QueryStatus.Error
-            : Data == null
-                ? QueryStatus.Pending
-                : QueryStatus.Success;
+    public QueryStatus Status
+    {
+        get
+        {
+            if (Error != null)
+                return QueryStatus.Error;
+            if (Data == null)
+                return QueryStatus.Pending;
+            return QueryStatus.Success;
+        }
+    }
 
     public bool IsFetchingBackground { get; private set; }
-    public bool IsLoading => FetchStatus == FetchStatus.Fetching
-                                && Data == null;
+    // React Query: isLoading = isPending && isFetching
+    // This means: first load in progress (no data yet and actively fetching/paused)
+    public bool IsLoading => Status == QueryStatus.Pending && 
+                             (FetchStatus == FetchStatus.Fetching || FetchStatus == FetchStatus.Paused);
 
     public int FailureCount { get; private set; }
     public bool IsRefetchError { get; private set; }
@@ -76,7 +84,6 @@ public class UseQuery<T> : IDisposable
     private CancellationTokenSource? _staleTimerCts;
     private CancellationTokenSource? _refetchIntervalCts;
 
-    private static readonly Random _jitterRandom = new();
 
     public UseQuery(
             QueryOptions<T> queryOptions,
@@ -138,7 +145,6 @@ public class UseQuery<T> : IDisposable
         if (_queryOptions.NetworkMode == NetworkMode.OfflineFirst && isDataStale)
         {
             _ = ExecuteAsync();
-            return Task.CompletedTask;
         }
 
         return Task.CompletedTask;
@@ -215,9 +221,10 @@ public class UseQuery<T> : IDisposable
                 _lastError = null;
             }
 
-            int maxRetries = _queryOptions.Retry ?? 0;
             TimeSpan maxRetryDelay = _queryOptions.MaxRetryDelay ?? TimeSpan.FromSeconds(30);
 
+            // React Query: retry indefinitely or until max retries reached
+            // attempt starts at 0 (initial try), then 1, 2, 3... (retries)
             for (int attempt = 0;; attempt++)
             {
                 try
@@ -261,10 +268,11 @@ public class UseQuery<T> : IDisposable
                     // infinite retry
                     if (_queryOptions.RetryInfinite) 
                         shouldRetry = true;
-                    // retry n times
+                    // retry n times: retry=3 means max 3 attempts total
+                    // attempt starts at 0, so retry while attempt < retry value
                     else if (_queryOptions.Retry.HasValue && attempt < _queryOptions.Retry.Value) 
                         shouldRetry = true;
-                    // custom retry func
+                    // custom retry func - receives attempt index (0-based) and exception
                     else if (_queryOptions.RetryFunc != null) 
                         shouldRetry = _queryOptions.RetryFunc(attempt, ex);
 
@@ -282,7 +290,7 @@ public class UseQuery<T> : IDisposable
                         return;
                     }
 
-                    // delay before retry
+                    // delay before retry - use attempt index for exponential backoff
                     int delayMs; 
                     if (_queryOptions.RetryDelayFunc != null)
                     {
@@ -290,8 +298,10 @@ public class UseQuery<T> : IDisposable
                     }
                     else
                     {
-                        double expDelay = Math.Pow(2, attempt) * 1000; 
-                        double jitter = _jitterRandom.NextDouble() * 300; 
+                        // Exponential backoff: Math.min((2 ** attemptIndex) * 1000, 30000)
+                        double expDelay = Math.Pow(2, attempt) * 1000;
+                        // Use Random.Shared for thread safety (.NET 6+)
+                        double jitter = Random.Shared.NextDouble() * 300; 
                         delayMs = (int)Math.Min(expDelay + jitter, maxRetryDelay.TotalMilliseconds);
                     }
 
@@ -335,7 +345,10 @@ public class UseQuery<T> : IDisposable
             {
                 _currentCts.Cancel();
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
 
         FetchStatus = FetchStatus.Paused;
@@ -406,7 +419,10 @@ public class UseQuery<T> : IDisposable
             if (_queryOptions.RefetchOnReconnect)
                 _onlineManager.OnlineStatusChanged -= _onlineStatusHandler;
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
         _currentCts?.Cancel();
         _currentCts?.Dispose();
