@@ -71,8 +71,6 @@ public class UseQuery<T> : IDisposable
     }
 
     public bool IsFetchingBackground { get; private set; }
-    // React Query: isLoading = isPending && isFetching
-    // This means: first load in progress (no data yet and actively fetching/paused)
     public bool IsLoading => Status == QueryStatus.Pending && 
                              (FetchStatus == FetchStatus.Fetching || FetchStatus == FetchStatus.Paused);
 
@@ -113,9 +111,7 @@ public class UseQuery<T> : IDisposable
             _queryOptions.RefetchOnReconnect = false;
 
         _onlineStatusHandler = () => _ = SafeHandleOnlineStatusChangedAsync();
-        // Subscribe to network changes for:
-        // 1. Pause/continue behavior (NetworkMode != Always)
-        // 2. RefetchOnReconnect behavior
+
         if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
         {
             _onlineManager.OnlineStatusChanged += _onlineStatusHandler;
@@ -153,7 +149,7 @@ public class UseQuery<T> : IDisposable
         }
 
         // If query is paused (mid-retry), signal to continue
-        // This is DIFFERENT from refetchOnReconnect - this continues existing fetch
+        // This is different from refetchOnReconnect - this continues existing fetch
         if (FetchStatus == FetchStatus.Paused)
         {
             // Release the semaphore to continue the paused retry
@@ -274,9 +270,10 @@ public class UseQuery<T> : IDisposable
 
             TimeSpan maxRetryDelay = _queryOptions.MaxRetryDelay ?? TimeSpan.FromSeconds(30);
 
-            // React Query: retry indefinitely or until max retries reached
-            // attempt starts at 0 (initial try), then 1, 2, 3... (retries)
-            for (int attempt = 0;; attempt++)
+            // attemptIndex tracks retry attempts (0 = first retry, 1 = second retry, etc.)
+            int attemptIndex = -1; // -1 means initial attempt (not a retry yet)
+            
+            for (;;)
             {
                 try
                 {
@@ -314,18 +311,22 @@ public class UseQuery<T> : IDisposable
                 {
                     FailureCount++;
                     _lastError = ex;
+                    attemptIndex++; // Increment for each failure (0 = first retry)
+                    
                     bool shouldRetry = false;
 
-                    // infinite retry
+                    // Retry logic:
+                    // - retry: false = no retries
+                    // - retry: true = infinite retries  
+                    // - retry: 6 = retry 6 times after initial (7 total attempts)
+                    // - retry: (failureCount, error) => custom logic (failureCount starts at 0)
+                    
                     if (_queryOptions.RetryInfinite) 
                         shouldRetry = true;
-                    // retry n times: retry=3 means max 3 attempts total
-                    // attempt starts at 0, so retry while attempt < retry value
-                    else if (_queryOptions.Retry.HasValue && attempt < _queryOptions.Retry.Value) 
+                    else if (_queryOptions.Retry.HasValue && attemptIndex < _queryOptions.Retry.Value) 
                         shouldRetry = true;
-                    // custom retry func - receives attempt index (0-based) and exception
                     else if (_queryOptions.RetryFunc != null) 
-                        shouldRetry = _queryOptions.RetryFunc(attempt, ex);
+                        shouldRetry = _queryOptions.RetryFunc(attemptIndex, ex);
 
                     if (!shouldRetry)
                     {
@@ -335,7 +336,7 @@ public class UseQuery<T> : IDisposable
                     }
 
                     // pause retry if offline, wait for online, then continue
-                    // This is NOT a refetch - it continues from current attempt
+                    // This is not a refetch - it continues from current attempt
                     if (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
                     {
                         FetchStatus = FetchStatus.Paused;
@@ -356,19 +357,16 @@ public class UseQuery<T> : IDisposable
                         FetchStatus = FetchStatus.Fetching;
                     }
 
-                    // delay before retry - use attempt index for exponential backoff
                     int delayMs; 
                     if (_queryOptions.RetryDelayFunc != null)
                     {
-                        delayMs = (int)_queryOptions.RetryDelayFunc(attempt).TotalMilliseconds;
+                        delayMs = (int)_queryOptions.RetryDelayFunc(attemptIndex).TotalMilliseconds;
                     }
                     else
                     {
-                        // Exponential backoff: Math.min((2 ** attemptIndex) * 1000, 30000)
-                        double expDelay = Math.Pow(2, attempt) * 1000;
-                        // Use Random.Shared for thread safety (.NET 6+)
-                        double jitter = Random.Shared.NextDouble() * 300; 
-                        delayMs = (int)Math.Min(expDelay + jitter, maxRetryDelay.TotalMilliseconds);
+                        // Default: Math.min(1000 * 2^attemptIndex, 30000)
+                        double expDelay = 1000 * Math.Pow(2, attemptIndex);
+                        delayMs = (int)Math.Min(expDelay, maxRetryDelay.TotalMilliseconds);
                     }
 
                     try
@@ -410,7 +408,7 @@ public class UseQuery<T> : IDisposable
                         continue; // Continue retry loop after resume
                     }
 
-                    // Check if we went offline DURING the delay (without cancellation)
+                    // Check if we went offline during the delay (without cancellation)
                     if (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
                     {
                         FetchStatus = FetchStatus.Paused;

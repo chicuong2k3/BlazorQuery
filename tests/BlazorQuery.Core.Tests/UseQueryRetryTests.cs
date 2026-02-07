@@ -10,17 +10,18 @@ public class UseQueryRetryTests : UseQueryTestsBase
             NetworkMode.Online,
             _ =>
             {
-                count++; if (count < 3)
+                count++;
+                if (count < 4) // Fail first 3 attempts, succeed on 4th
                     throw new Exception("Fail");
 
                 return Task.FromResult(new List<string> { "ok" });
             },
-            retry: 3
+            retry: 3 // React Query: 3 retries after initial = 4 total attempts
         );
         SetOnline(true);
         var snapshots = await ObserveQuery(query);
-        Assert.Equal(2, query.FailureCount);
-        Assert.Equal(3, count);
+        Assert.Equal(3, query.FailureCount); // 3 failures before success
+        Assert.Equal(4, count); // 4 total attempts (1 initial + 3 retries)
         Assert.Equal(QueryStatus.Success, snapshots[^1].Status);
     }
 
@@ -55,17 +56,18 @@ public class UseQueryRetryTests : UseQueryTestsBase
             NetworkMode.Online,
             _ =>
             {
-                count++; if (count < 5)
+                count++;
+                if (count < 5) // Always fail
                     throw new Exception("Fail");
 
                 return Task.FromResult(new List<string> { "ok" });
             },
-            retryFunc: (attempt, ex) => attempt < 3
+            retryFunc: (attemptIndex, ex) => attemptIndex < 3 // 0, 1, 2 = 3 retries
         );
 
         SetOnline(true);
         var snapshots = await ObserveQuery(query);
-        Assert.Equal(4, count);
+        Assert.Equal(4, count); // Initial + 3 retries = 4 attempts
         Assert.Equal(QueryStatus.Error, snapshots[^1].Status);
     }
 
