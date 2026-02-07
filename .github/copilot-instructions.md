@@ -1,12 +1,12 @@
-# GitHub Copilot Instructions for BlazorQuery
+# GitHub Copilot Instructions for SwrSharp
 
 ## Project Overview
-BlazorQuery is a C# port of TanStack React Query for Blazor applications. It provides powerful asynchronous state management, caching, and data synchronization capabilities.
+SwrSharp is a C# port of TanStack React Query for Blazor applications. It provides powerful asynchronous state management, caching, and data synchronization capabilities.
 
 ## Core Principles
 
 ### 1. React Query Compatibility
-**CRITICAL**: BlazorQuery aims to closely follow React Query's behavior and patterns.
+**CRITICAL**: SwrSharp aims to closely follow React Query's behavior and patterns.
 
 When implementing features or making changes:
 1. **Always check React Query documentation first** at https://tanstack.com/query/latest/docs/framework/react/overview
@@ -64,7 +64,7 @@ Implement three network modes:
 
 ### 5. Retry Logic
 **Matches React Query exactly:**
-- BlazorQuery: `retry: 3` = 3 retries after initial attempt (4 total attempts)
+- SwrSharp: `retry: 3` = 3 retries after initial attempt (4 total attempts)
 - React Query: `retry: 3` = 3 retries after initial (4 total attempts)
 - ✅ Same behavior!
 
@@ -177,7 +177,7 @@ When reviewing PRs, verify the implementation matches React Query behavior. Use 
 
 ### Query State & Status
 
-| Feature | React Query | BlazorQuery | Check |
+| Feature | React Query | SwrSharp | Check |
 |---------|-------------|-------------|-------|
 | `status: 'pending'` | No data, no error | `Status == QueryStatus.Pending` | ✅ |
 | `status: 'error'` | Has error (even with stale data) | `Status == QueryStatus.Error` | ✅ |
@@ -194,7 +194,7 @@ When reviewing PRs, verify the implementation matches React Query behavior. Use 
 
 ### Retry Behavior
 
-| Feature | React Query | BlazorQuery | Check |
+| Feature | React Query | SwrSharp | Check |
 |---------|-------------|-------------|-------|
 | `retry: false` | No retries | `Retry = 0` or not set | ✅ |
 | `retry: 3` | 3 retries (4 total attempts) | `Retry = 3` → 3 retries | ✅ |
@@ -208,7 +208,7 @@ When reviewing PRs, verify the implementation matches React Query behavior. Use 
 
 ### Network Mode Behavior
 
-| Feature | React Query | BlazorQuery | Check |
+| Feature | React Query | SwrSharp | Check |
 |---------|-------------|-------------|-------|
 | Online mode - offline | Pauses fetch | Sets `FetchStatus.Paused` | ✅ |
 | Online mode - reconnect | Continues/refetches | Continues from pause | ✅ |
@@ -221,7 +221,7 @@ When reviewing PRs, verify the implementation matches React Query behavior. Use 
 
 ### Stale Time & Caching
 
-| Feature | React Query | BlazorQuery | Check |
+| Feature | React Query | SwrSharp | Check |
 |---------|-------------|-------------|-------|
 | `staleTime: 0` | Always stale | Default behavior | ✅ |
 | `staleTime: Infinity` | Never stale | Large TimeSpan | ✅ |
@@ -230,7 +230,7 @@ When reviewing PRs, verify the implementation matches React Query behavior. Use 
 
 ### Refetch Behavior
 
-| Feature | React Query | BlazorQuery | Check |
+| Feature | React Query | SwrSharp | Check |
 |---------|-------------|-------------|-------|
 | `refetchOnReconnect` | Refetch on network return | `RefetchOnReconnect` | ✅ |
 | `refetchInterval` | Polling interval | `RefetchInterval` | ✅ |
@@ -238,7 +238,7 @@ When reviewing PRs, verify the implementation matches React Query behavior. Use 
 
 ### Query Function Context
 
-| Feature | React Query | BlazorQuery | Check |
+| Feature | React Query | SwrSharp | Check |
 |---------|-------------|-------------|-------|
 | `queryKey` | Array of keys | `QueryKey` | ✅ |
 | `signal` | AbortSignal | `CancellationToken` | ✅ |
@@ -278,7 +278,7 @@ When reviewing a PR, ask these questions:
 
 Document any intentional differences here:
 
-| Feature | React Query | BlazorQuery | Reason |
+| Feature | React Query | SwrSharp | Reason |
 |---------|-------------|-------------|--------|
 | `refetchIntervalInBackground` | Pauses when tab hidden | Not implemented | Blazor doesn't have native tab visibility API; requires JS interop |
 | Suspense support | Built-in | Not applicable | C# doesn't have Suspense pattern |
@@ -297,14 +297,14 @@ Document any intentional differences here:
 ## References
 
 - React Query Docs: https://tanstack.com/query/latest/docs/framework/react/overview
-- BlazorQuery Docs: See markdown files in root directory
+- SwrSharp Docs: See markdown files in root directory
 - Fixes History: See `FIXES_APPLIED.md`
 
 ## Questions?
 
 When in doubt:
 1. Check React Query documentation
-2. Look at existing BlazorQuery patterns
+2. Look at existing SwrSharp patterns
 3. Review test cases for expected behavior
 4. Ask for clarification before making assumptions
 

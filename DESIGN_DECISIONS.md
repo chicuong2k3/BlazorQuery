@@ -129,7 +129,7 @@ const { data } = useQuery<Post[]>({ queryKey: ['/posts'] })
 //                          ^^^^^^ Manual type annotation needed
 ```
 
-### BlazorQuery (C#)
+### SwrSharp (C#)
 ```csharp
 // Per-type functions
 queryClient.SetDefaultQueryFn<List<Post>>(async ctx => {
@@ -282,7 +282,7 @@ var query = new UseQuery<Post>(...);
 
 ## Conclusion
 
-BlazorQuery's type-safe approach:
+SwrSharp's type-safe approach:
 
 1. **Embraces C# Strengths**: Leverages strong typing
 2. **Better Than Direct Port**: More than translation, it's adaptation

@@ -10,7 +10,7 @@ Implemented automatic refetching of stale queries when window gains focus, with 
 
 ### 1. **IFocusManager Interface** ✅ (NEW)
 
-**File**: `src/BlazorQuery.Core/IFocusManager.cs`
+**File**: `src/SwrSharp.Core/IFocusManager.cs`
 
 ```csharp
 public interface IFocusManager
@@ -26,7 +26,7 @@ public interface IFocusManager
 
 ### 2. **DefaultFocusManager** ✅ (NEW)
 
-**File**: `src/BlazorQuery.Core/DefaultFocusManager.cs`
+**File**: `src/SwrSharp.Core/DefaultFocusManager.cs`
 
 ```csharp
 public class DefaultFocusManager : IFocusManager
@@ -44,7 +44,7 @@ public class DefaultFocusManager : IFocusManager
 
 ### 3. **QueryOptions Enhancement** ✅
 
-**File**: `src/BlazorQuery.Core/QueryOptions.cs`
+**File**: `src/SwrSharp.Core/QueryOptions.cs`
 
 ```csharp
 public QueryOptions(
@@ -60,7 +60,7 @@ public bool RefetchOnWindowFocus { get; set; } = true;
 
 ### 4. **QueryClient Enhancement** ✅
 
-**File**: `src/BlazorQuery.Core/QueryClient.cs`
+**File**: `src/SwrSharp.Core/QueryClient.cs`
 
 ```csharp
 public class QueryClient
@@ -80,7 +80,7 @@ public class QueryClient
 
 ### 5. **UseQuery Integration** ✅
 
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 ```csharp
 // Subscribe to focus events
@@ -116,7 +116,7 @@ private async Task HandleFocusChangedAsync(bool isFocused)
 
 ### 6. **Comprehensive Tests** ✅
 
-**File**: `tests/BlazorQuery.Core.Tests/WindowFocusRefetchingTests.cs`
+**File**: `tests/SwrSharp.Core.Tests/WindowFocusRefetchingTests.cs`
 
 **Test Coverage** (10 tests):
 1. ✅ `RefetchOnWindowFocus_ShouldRefetchWhenWindowGainsFocus`
@@ -232,7 +232,7 @@ queryClient.FocusManager.SetFocused(null);  // Automatic detection
 
 ## 📊 React Query Parity
 
-| Feature | React Query | BlazorQuery | Status |
+| Feature | React Query | SwrSharp | Status |
 |---------|-------------|-------------|--------|
 | `refetchOnWindowFocus` | ✓ | ✓ | ✅ Same |
 | Per-query disable | ✓ | ✓ | ✅ Same |
@@ -282,15 +282,15 @@ queryClient.FocusManager.SetFocused(null);  // Automatic detection
 ## 📁 Files Created/Modified
 
 ### New Files:
-1. ✅ `src/BlazorQuery.Core/IFocusManager.cs` - Interface
-2. ✅ `src/BlazorQuery.Core/DefaultFocusManager.cs` - Default implementation
-3. ✅ `tests/BlazorQuery.Core.Tests/WindowFocusRefetchingTests.cs` - 10 tests
+1. ✅ `src/SwrSharp.Core/IFocusManager.cs` - Interface
+2. ✅ `src/SwrSharp.Core/DefaultFocusManager.cs` - Default implementation
+3. ✅ `tests/SwrSharp.Core.Tests/WindowFocusRefetchingTests.cs` - 10 tests
 4. ✅ `10. Window Focus Refetching.md` - Documentation
 
 ### Modified Files:
-5. ✅ `src/BlazorQuery.Core/QueryOptions.cs` - Added `refetchOnWindowFocus`
-6. ✅ `src/BlazorQuery.Core/QueryClient.cs` - Added `FocusManager`
-7. ✅ `src/BlazorQuery.Core/UseQuery.cs` - Focus event handling
+5. ✅ `src/SwrSharp.Core/QueryOptions.cs` - Added `refetchOnWindowFocus`
+6. ✅ `src/SwrSharp.Core/QueryClient.cs` - Added `FocusManager`
+7. ✅ `src/SwrSharp.Core/UseQuery.cs` - Focus event handling
 8. ✅ `README.md` - Added documentation link
 
 ---

@@ -1,6 +1,12 @@
-# BlazorQuery 🚀
+# SwrSharp 🚀
 
-A powerful asynchronous state management library for Blazor, inspired by [TanStack React Query](https://tanstack.com/query/latest).
+A powerful SWR (Stale-While-Revalidate) data fetching library for .NET, inspired by [Vercel SWR](https://swr.vercel.app/) and [TanStack Query](https://tanstack.com/query/latest).
+
+**SwrSharp.Core** is the platform-agnostic core library. Future packages will include:
+- `SwrSharp.Blazor` - Blazor Server/WASM integration
+- `SwrSharp.Wpf` - WPF integration
+- `SwrSharp.Maui` - .NET MAUI integration
+- `SwrSharp.Avalonia` - Avalonia UI integration
 
 ## ✨ Features
 
@@ -12,6 +18,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - 🎯 **Type-Safe** - Full C# type safety with generics
 - 🧵 **Thread-Safe** - Designed for concurrent access
 - 📱 **Offline-First Ready** - Support for offline-first architectures
+- 🖥️ **Multi-Platform** - Core library works with any .NET UI framework
 
 ## 📚 Documentation
 
@@ -44,12 +51,14 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 ### Installation
 
 ```bash
-dotnet add package BlazorQuery.Core
+dotnet add package SwrSharp.Core
 ```
 
 ### Basic Usage
 
 ```csharp
+using SwrSharp.Core;
+
 // Create a query client
 var queryClient = new QueryClient();
 
@@ -62,211 +71,104 @@ var todosQuery = new UseQuery<List<Todo>>(
     queryClient
 );
 
-// Execute the query
+// Execute and get data
 await todosQuery.ExecuteAsync();
 
-// Access the data
-if (todosQuery.IsLoading)
+if (todosQuery.IsSuccess)
 {
-    // Show loading state
-}
-else if (todosQuery.IsError)
-{
-    // Show error: todosQuery.Error
-}
-else if (todosQuery.IsSuccess)
-{
-    // Use data: todosQuery.Data
+    var todos = todosQuery.Data;
+    // Use your data!
 }
 ```
 
-### With Parameters
+### With Type-Safe Default Query Functions
 
 ```csharp
-var todoQuery = new UseQuery<Todo>(
-    new QueryOptions<Todo>(
-        queryKey: new("todo", todoId),
-        queryFn: async ctx => {
-            var id = (int)ctx.QueryKey[1]!;
-            return await FetchTodoByIdAsync(id);
-        }
-    ),
+using SwrSharp.Core;
+
+// Create query client with default functions per type
+var queryClient = new QueryClient();
+
+queryClient.SetDefaultQueryFn<List<Todo>>(async ctx => {
+    var response = await httpClient.GetAsync("/api/todos", ctx.Signal);
+    return await response.Content.ReadFromJsonAsync<List<Todo>>() 
+           ?? new List<Todo>();
+});
+
+// Now queries just need a key!
+var todosQuery = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(queryKey: new("todos")),
     queryClient
 );
 
-// Or with destructuring (JavaScript-like!)
-var todoQuery = new UseQuery<Todo>(
-    new QueryOptions<Todo>(
-        queryKey: new("todo", todoId),
-        queryFn: async ctx => {
-            var (queryKey, signal) = ctx; // Destructure context
-            var id = (int)queryKey[1]!;
-            return await FetchTodoByIdAsync(id, signal);
-        }
-    ),
-    queryClient
-);
+await todosQuery.ExecuteAsync();
+```
+
+## 🎯 Key Concepts
+
+### Query States
+
+```csharp
+// Status (derived from data/error)
+query.IsPending   // No data yet
+query.IsSuccess   // Has data
+query.IsError     // Has error
+
+// Fetch Status (network activity)
+query.IsFetching  // Currently fetching
+query.IsLoading   // First load (pending + fetching)
+```
+
+### Caching & Freshness
+
+```csharp
+new QueryOptions<List<Todo>>(
+    queryKey: new("todos"),
+    queryFn: async ctx => await FetchTodosAsync(),
+    staleTime: TimeSpan.FromMinutes(5) // Data fresh for 5 minutes
+)
 ```
 
 ### Network Modes
 
 ```csharp
-var query = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        networkMode: NetworkMode.Online, // or Always, OfflineFirst
-        refetchOnReconnect: true
-    ),
-    queryClient
-);
+// Online (default): Pause when offline
+// Always: Ignore network state  
+// OfflineFirst: Try once, then pause if offline
+networkMode: NetworkMode.Online
 ```
 
-### Retry Configuration
+### Retry Logic
 
 ```csharp
-var query = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        retry: 3, // Max 3 total attempts
-        retryDelay: TimeSpan.FromSeconds(1),
-        maxRetryDelay: TimeSpan.FromSeconds(30)
-    ),
-    queryClient
-);
+new QueryOptions<List<Todo>>(
+    queryKey: new("todos"),
+    queryFn: async ctx => await FetchTodosAsync(),
+    retry: 3, // Retry 3 times on failure
+    retryDelayFunc: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))
+)
 ```
 
-### Stale Time & Background Refetching
-
-```csharp
-var query = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        staleTime: TimeSpan.FromMinutes(5), // Data fresh for 5 minutes
-        refetchInterval: TimeSpan.FromMinutes(1) // Poll every minute
-    ),
-    queryClient
-);
-```
-
-### Reusable Query Options
-
-Create factory methods for better organization and reusability:
-
-```csharp
-// Define reusable query options
-static QueryOptions<Todo> TodoOptions(int id)
-{
-    return new QueryOptions<Todo>(
-        queryKey: new("todo", id),
-        queryFn: async ctx => {
-            var (queryKey, signal) = ctx;
-            var todoId = (int)queryKey[1]!;
-            return await FetchTodoAsync(todoId, signal);
-        },
-        staleTime: TimeSpan.FromMinutes(5)
-    );
-}
-
-// Use everywhere
-var query1 = new UseQuery<Todo>(TodoOptions(1), queryClient);
-var query2 = new UseQuery<Todo>(TodoOptions(2), queryClient);
-await queryClient.PrefetchQueryAsync(TodoOptions(3));
-```
-
-See [Query Options](./5.%20Query%20Options.md) for more details.
-
-## 🎯 Key Concepts
-
-### Query Status
-
-Queries can be in one of three states:
-
-- **Pending** - No data yet and no error
-- **Success** - Has data and no error  
-- **Error** - Has error (even if there's stale data)
-
-### Fetch Status
-
-Tracks the current fetch operation:
-
-- **Idle** - Not currently fetching
-- **Fetching** - Actively fetching data
-- **Paused** - Fetch paused due to network conditions
-
-### Loading States
-
-- `IsLoading` - First load in progress (pending && (fetching || paused))
-- `IsFetching` - Any fetch in progress
-- `IsFetchingBackground` - Background refetch with existing data
-
-## 🔍 React Query Compatibility
-
-BlazorQuery closely follows React Query's behavior and patterns. Key differences:
-
-- **Retry behavior**: `retry: 3` means 3 total attempts (React Query: 3 retries after initial = 4 total)
-- **Language**: C# idioms instead of TypeScript/JavaScript
-
-See [Copilot Instructions](./.github/copilot-instructions.md) for detailed compatibility notes.
-
-## 🧪 Testing
-
-```bash
-dotnet test
-```
-
-All 40 tests should pass:
-```
-Passed!  - Failed:     0, Passed:    40, Skipped:     0, Total:    40
-```
-
-## 🛠️ Development
-
-### Requirements
-
-- .NET 8.0 or later
-- C# 12.0 or later
-
-### Project Structure
+## 📦 Package Structure
 
 ```
-BlazorQuery/
-├── src/
-│   └── BlazorQuery.Core/        # Core library
-├── tests/
-│   └── BlazorQuery.Core.Tests/  # Unit tests
-└── *.md                          # Documentation
+SwrSharp.Core        → Core library (you are here)
+SwrSharp.Blazor      → Blazor integration (coming soon)
+SwrSharp.Wpf         → WPF integration (coming soon)
+SwrSharp.Maui        → .NET MAUI integration (coming soon)
+SwrSharp.Avalonia    → Avalonia integration (coming soon)
 ```
-
-## 📝 Recent Fixes
-
-See [FIXES_APPLIED.md](./FIXES_APPLIED.md) for detailed information about recent improvements:
-
-- ✅ Fixed QueryStatus logic to match React Query
-- ✅ Fixed IsLoading definition to include Paused state
-- ✅ Fixed thread safety issue with Random
 
 ## 🤝 Contributing
 
-When contributing:
-
-1. Check [React Query documentation](https://tanstack.com/query/latest) for expected behavior
-2. Follow the patterns in [Copilot Instructions](./.github/copilot-instructions.md)
-3. Ensure all tests pass
-4. Update documentation if changing behavior
-5. Add tests for new features
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-[Your License Here]
+This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-Inspired by [TanStack Query](https://tanstack.com/query/latest) (formerly React Query).
-
----
-
-**⚡ Built with performance and developer experience in mind.**
+- [Vercel SWR](https://swr.vercel.app/) - The original SWR library for React
+- [TanStack Query](https://tanstack.com/query/latest) - Powerful data synchronization for web
 

@@ -12,7 +12,7 @@
 
 ---
 
-## 📊 BlazorQuery Implementation Hiện Tại
+## 📊 SwrSharp Implementation Hiện Tại
 
 ### ✅ Đã implement:
 1. **Pause retry khi offline** (line 304-319 UseQuery.cs)
@@ -67,7 +67,7 @@ Attempt 1 → FetchAsync started → (offline mid-fetch) → ???
 - Browser events (`online`/`offline`) reliable
 - Có thể pause HTTP requests mid-flight
 
-### BlazorQuery (C#/.NET):
+### SwrSharp (C#/.NET):
 - Chạy trên server hoặc WebAssembly  
 - `HttpClient` KHÔNG tự động pause khi offline
 - Network detection phụ thuộc vào `IOnlineManager` implementation
@@ -86,11 +86,11 @@ Attempt 1 → FetchAsync started → (offline mid-fetch) → ???
 ### What's Different ⚠️:
 1. **Mid-fetch pause**: Không thể pause .NET HTTP request mid-flight
    - React Query: Browser pause request
-   - BlazorQuery: Must cancel and restart (hoặc let it complete)
+   - SwrSharp: Must cancel and restart (hoặc let it complete)
    
 2. **Network detection**: Phụ thuộc vào `IOnlineManager`
    - React Query: Browser `navigator.onLine`
-   - BlazorQuery: Custom implementation
+   - SwrSharp: Custom implementation
 
 ### What's Missing ❌:
 1. **Automatic mid-fetch detection**: Cần queryFn cooperate với CancellationToken
@@ -141,7 +141,7 @@ Update `3. Network Mode.md` to clarify:
 ```markdown
 ### Pause and Continue Behavior
 
-When a query is retrying and the network goes offline, BlazorQuery will:
+When a query is retrying and the network goes offline, SwrSharp will:
 1. **Pause the retry mechanism** (not restart)
 2. **Wait for network** to come back online
 3. **Continue from current attempt** (not from beginning)

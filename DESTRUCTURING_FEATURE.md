@@ -34,7 +34,7 @@ queryFn: async ctx => {
 
 ### Code Changes
 
-#### File: `src/BlazorQuery.Core/QueryFunctionContext.cs`
+#### File: `src/SwrSharp.Core/QueryFunctionContext.cs`
 
 Thêm 2 `Deconstruct` methods:
 
@@ -156,7 +156,7 @@ const fetchTodo = async ({ queryKey, signal, meta }) => {
 }
 ```
 
-### C# (BlazorQuery) - Before:
+### C# (SwrSharp) - Before:
 ```csharp
 async Task<Todo> FetchTodo(QueryFunctionContext ctx)
 {
@@ -165,7 +165,7 @@ async Task<Todo> FetchTodo(QueryFunctionContext ctx)
 }
 ```
 
-### C# (BlazorQuery) - After:
+### C# (SwrSharp) - After:
 ```csharp
 async Task<Todo> FetchTodo(QueryFunctionContext ctx)
 {
@@ -262,7 +262,7 @@ Uses C# 7.0+ deconstruction feature - modern and idiomatic
 
 ### Files Modified:
 
-1. **`src/BlazorQuery.Core/QueryFunctionContext.cs`**
+1. **`src/SwrSharp.Core/QueryFunctionContext.cs`**
    - ✅ Added 2 `Deconstruct` methods
    - ✅ XML documentation for both
 
@@ -276,7 +276,7 @@ Uses C# 7.0+ deconstruction feature - modern and idiomatic
    - ✅ Added destructuring example in "With Parameters" section
    - ✅ Comment highlighting it's JavaScript-like
 
-4. **`tests/BlazorQuery.Core.Tests/UseQueryTests.cs`**
+4. **`tests/SwrSharp.Core.Tests/UseQueryTests.cs`**
    - ✅ Added 2 new tests
    - ✅ Test 2-property destructuring
    - ✅ Test 3-property destructuring with meta
@@ -327,7 +327,7 @@ queryFn: async ctx => {
 
 ## 🚀 Conclusion
 
-Feature này làm cho BlazorQuery:
+Feature này làm cho SwrSharp:
 - ✅ **Gần giống JavaScript/TypeScript hơn**
 - ✅ **Code cleaner và ngắn gọn hơn**
 - ✅ **Developer experience tốt hơn**
@@ -335,5 +335,5 @@ Feature này làm cho BlazorQuery:
 - ✅ **Backward compatible** - không breaking changes
 - ✅ **Modern C#** - sử dụng language features tốt nhất
 
-**Perfect addition to make BlazorQuery feel more like React Query!** 🎉
+**Perfect addition to make SwrSharp feel more like React Query!** 🎉
 
