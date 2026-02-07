@@ -1,0 +1,538 @@
+---
+title: "Query Invalidation"
+description: "Guide for Query Invalidation in SwrSharp"
+order: 15
+category: "Guides"
+---
+# Query Invalidation
+
+Waiting for queries to become stale before they are fetched again doesn't always work, especially when you know for a fact that a query's data is out of date because of something the user has done. For that purpose, the `QueryClient` has an `InvalidateQueries` method that lets you intelligently mark queries as stale and potentially refetch them too!
+
+```csharp
+// Invalidate every query in the cache
+queryClient.InvalidateQueries();
+
+// Invalidate every query with a key that starts with "todos"
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos") 
+});
+```
+
+> **Note**: Where other libraries that use normalized caches would attempt to update local queries with the new data either imperatively or via schema inference, SwrSharp gives you the tools to avoid the manual labor that comes with maintaining normalized caches and instead prescribes **targeted invalidation, background-refetching and ultimately atomic updates**.
+
+## What Happens When a Query is Invalidated?
+
+When a query is invalidated with `InvalidateQueries`, two things happen:
+
+1. **It is marked as stale**. This stale state overrides any `staleTime` configurations being used in `UseQuery`
+2. **If the query is currently being rendered** (has active `UseQuery` instances), it will also be refetched in the background automatically
+
+## Query Matching with `InvalidateQueries`
+
+When using `InvalidateQueries`, you can match multiple queries by their prefix, get really specific and match an exact query, or use custom predicates.
+
+### Prefix Matching (Default)
+
+In this example, we can use the "todos" prefix to invalidate any queries that start with "todos" in their query key:
+
+```csharp
+var queryClient = new QueryClient();
+
+// Invalidate with prefix
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos") 
+});
+
+// Both queries below will be invalidated
+var todoListQuery = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos"),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+
+var todoDetailQuery = new UseQuery<Todo>(
+    new QueryOptions<Todo>(
+        queryKey: new("todos", new { page = 1 }),
+        queryFn: async ctx => await FetchTodoListAsync(page: 1)
+    ),
+    queryClient
+);
+```
+
+### Specific Variables
+
+You can even invalidate queries with specific variables by passing a more specific query key:
+
+```csharp
+queryClient.InvalidateQueries(new QueryFilters
+{
+    QueryKey = new("todos", new { type = "done" })
+});
+
+// The query below will be invalidated
+var query1 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos", new { type = "done" }),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+
+// However, the following query below will NOT be invalidated
+var query2 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos"),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+```
+
+### Exact Matching
+
+The `InvalidateQueries` API is very flexible, so even if you want to **only** invalidate "todos" queries that don't have any more variables or subkeys, you can pass `Exact = true` option:
+
+```csharp
+queryClient.InvalidateQueries(new QueryFilters
+{
+    QueryKey = new("todos"),
+    Exact = true
+});
+
+// The query below will be invalidated
+var query1 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos"),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+
+// However, the following query below will NOT be invalidated
+var query2 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos", new { type = "done" }),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+```
+
+### Custom Predicate
+
+If you find yourself wanting **even more** granularity, you can pass a predicate function. This function will receive each `QueryKey` from the query cache and allow you to return `true` or `false` for whether you want to invalidate that query:
+
+```csharp
+queryClient.InvalidateQueries(new QueryFilters
+{
+    Predicate = key => {
+        if (key.Parts.Count < 2 || key.Parts[0]?.ToString() != "todos")
+            return false;
+        
+        // Get version from anonymous object in key
+        var versionObj = key.Parts[1];
+        var versionProp = versionObj?.GetType().GetProperty("version");
+        var version = (int?)versionProp?.GetValue(versionObj);
+        
+        return version >= 10;
+    }
+});
+
+// The query below will be invalidated
+var query1 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos", new { version = 20 }),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+
+// The query below will be invalidated
+var query2 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos", new { version = 10 }),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+
+// However, the following query below will NOT be invalidated
+var query3 = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos", new { version = 5 }),
+        queryFn: async ctx => await FetchTodoListAsync()
+    ),
+    queryClient
+);
+```
+
+## Common Use Cases
+
+### After Mutations
+
+Invalidate queries after creating, updating, or deleting data:
+
+```csharp
+public class TodoService
+{
+    private readonly QueryClient _queryClient;
+    private readonly HttpClient _httpClient;
+
+    public async Task<Todo> CreateTodoAsync(string title)
+    {
+        // Create todo
+        var response = await _httpClient.PostAsJsonAsync("/api/todos", new { title });
+        var todo = await response.Content.ReadFromJsonAsync<Todo>();
+
+        // Invalidate todos list to refetch with new item
+        _queryClient.InvalidateQueries(new QueryFilters
+        {
+            QueryKey = new("todos")
+        });
+
+        return todo!;
+    }
+
+    public async Task UpdateTodoAsync(int id, string title)
+    {
+        // Update todo
+        await _httpClient.PutAsJsonAsync($"/api/todos/{id}", new { title });
+
+        // Invalidate both list and detail
+        _queryClient.InvalidateQueries(new QueryFilters
+        {
+            QueryKey = new("todos")
+        });
+    }
+
+    public async Task DeleteTodoAsync(int id)
+    {
+        // Delete todo
+        await _httpClient.DeleteAsync($"/api/todos/{id}");
+
+        // Invalidate all todos queries
+        _queryClient.InvalidateQueries(new QueryFilters
+        {
+            QueryKey = new("todos")
+        });
+    }
+}
+```
+
+### User Actions
+
+Invalidate when user explicitly requests fresh data:
+
+```csharp
+public async Task OnRefreshButtonClickAsync()
+{
+    // User clicked refresh - invalidate current page data
+    _queryClient.InvalidateQueries(new QueryFilters
+    {
+        QueryKey = new("currentPage")
+    });
+}
+```
+
+### Background Sync
+
+Invalidate after background sync completes:
+
+```csharp
+public class SyncService
+{
+    private readonly QueryClient _queryClient;
+
+    public async Task PerformBackgroundSyncAsync()
+    {
+        // Sync data with server
+        await SyncWithServerAsync();
+
+        // Invalidate all queries to show fresh data
+        _queryClient.InvalidateQueries();
+    }
+}
+```
+
+## Complete Example: Todo CRUD with Invalidation
+
+```csharp
+public class TodoApp : IDisposable
+{
+    private readonly QueryClient _queryClient;
+    private readonly HttpClient _httpClient;
+    private UseQuery<List<Todo>>? _todosQuery;
+
+    public TodoApp(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+        _queryClient = new QueryClient();
+    }
+
+    public async Task LoadTodosAsync()
+    {
+        _todosQuery = new UseQuery<List<Todo>>(
+            new QueryOptions<List<Todo>>(
+                queryKey: new("todos"),
+                queryFn: async ctx => {
+                    Console.WriteLine("Fetching todos...");
+                    var response = await _httpClient.GetAsync("/api/todos");
+                    return await response.Content.ReadFromJsonAsync<List<Todo>>()
+                           ?? new List<Todo>();
+                },
+                staleTime: TimeSpan.FromMinutes(5)
+            ),
+            _queryClient
+        );
+
+        _todosQuery.OnChange += RenderTodos;
+
+        await _todosQuery.ExecuteAsync();
+    }
+
+    public async Task CreateTodoAsync(string title)
+    {
+        Console.WriteLine($"Creating todo: {title}");
+        
+        // API call
+        var response = await _httpClient.PostAsJsonAsync("/api/todos", 
+            new { title });
+        
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Todo created!");
+            
+            // Invalidate todos query to refetch list
+            _queryClient.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new("todos")
+            });
+            
+            // Query automatically refetches in background
+            Console.WriteLine("Refreshing todos list...");
+        }
+    }
+
+    public async Task UpdateTodoAsync(int id, string newTitle)
+    {
+        Console.WriteLine($"Updating todo {id}...");
+        
+        var response = await _httpClient.PutAsJsonAsync($"/api/todos/{id}",
+            new { title = newTitle });
+        
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Todo updated!");
+            
+            // Invalidate both list and detail queries
+            _queryClient.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new("todos") // Matches "todos" and "todos", id
+            });
+        }
+    }
+
+    public async Task DeleteTodoAsync(int id)
+    {
+        Console.WriteLine($"Deleting todo {id}...");
+        
+        var response = await _httpClient.DeleteAsync($"/api/todos/{id}");
+        
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Todo deleted!");
+            
+            // Invalidate all todos queries
+            _queryClient.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new("todos")
+            });
+        }
+    }
+
+    public void ForceRefreshAll()
+    {
+        Console.WriteLine("Force refreshing all data...");
+        
+        // Invalidate everything
+        _queryClient.InvalidateQueries();
+    }
+
+    private void RenderTodos()
+    {
+        if (_todosQuery == null) return;
+
+        Console.WriteLine("=== Todos ===");
+        
+        if (_todosQuery.IsLoading)
+        {
+            Console.WriteLine("Loading...");
+        }
+        else if (_todosQuery.IsError)
+        {
+            Console.WriteLine($"Error: {_todosQuery.Error?.Message}");
+        }
+        else if (_todosQuery.Data != null)
+        {
+            foreach (var todo in _todosQuery.Data)
+            {
+                Console.WriteLine($"  [{(todo.Done ? "x" : " ")}] {todo.Title}");
+            }
+        }
+
+        if (_todosQuery.IsFetchingBackground)
+        {
+            Console.WriteLine("🔄 Refreshing...");
+        }
+    }
+
+    public void Dispose()
+    {
+        _todosQuery?.Dispose();
+        _queryClient?.Dispose();
+    }
+}
+
+// Models
+public class Todo
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public bool Done { get; set; }
+}
+```
+
+## Best Practices
+
+### 1. **Invalidate After Mutations**
+
+```csharp
+// ✅ Good: Invalidate after successful mutation
+await CreateTodoAsync();
+queryClient.InvalidateQueries(new QueryFilters { QueryKey = new("todos") });
+
+// ❌ Bad: Forget to invalidate
+await CreateTodoAsync();
+// Users see stale data!
+```
+
+### 2. **Use Prefix Matching**
+
+```csharp
+// ✅ Good: Invalidate all related queries
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos") // Matches todos, todos/1, todos/list, etc.
+});
+
+// ❌ Bad: Only exact match
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos"),
+    Exact = true // Misses todos/1, todos/list
+});
+```
+
+### 3. **Targeted Invalidation**
+
+```csharp
+// ✅ Good: Only invalidate what changed
+await UpdateTodo(id: 5);
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos") // Invalidates list and detail
+});
+
+// ❌ Bad: Invalidate everything
+queryClient.InvalidateQueries(); // Also invalidates users, posts, etc.
+```
+
+### 4. **Check Success Before Invalidating**
+
+```csharp
+// ✅ Good: Only invalidate on success
+var response = await httpClient.PostAsync(...);
+if (response.IsSuccessStatusCode)
+{
+    queryClient.InvalidateQueries(new QueryFilters { QueryKey = new("todos") });
+}
+
+// ❌ Bad: Always invalidate
+await httpClient.PostAsync(...);
+queryClient.InvalidateQueries(new QueryFilters { QueryKey = new("todos") });
+// Invalidates even if request failed!
+```
+
+## Comparison with React Query
+
+### React Query (TypeScript):
+```typescript
+// Invalidate all
+queryClient.invalidateQueries()
+
+// Prefix match
+queryClient.invalidateQueries({ queryKey: ['todos'] })
+
+// Exact match
+queryClient.invalidateQueries({ 
+  queryKey: ['todos'], 
+  exact: true 
+})
+
+// Custom predicate
+queryClient.invalidateQueries({
+  predicate: (query) => 
+    query.queryKey[0] === 'todos' && query.queryKey[1]?.version >= 10
+})
+```
+
+### SwrSharp (C#):
+```csharp
+// Invalidate all
+queryClient.InvalidateQueries();
+
+// Prefix match
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos") 
+});
+
+// Exact match
+queryClient.InvalidateQueries(new QueryFilters 
+{ 
+    QueryKey = new("todos"),
+    Exact = true
+});
+
+// Custom predicate
+queryClient.InvalidateQueries(new QueryFilters
+{
+    Predicate = key => {
+        if (key.Parts[0]?.ToString() != "todos") return false;
+        var versionObj = key.Parts[1];
+        var version = (int?)versionObj?.GetType()
+                          .GetProperty("version")?.GetValue(versionObj);
+        return version >= 10;
+    }
+});
+```
+
+---
+
+## Summary
+
+- ✅ `InvalidateQueries()` marks queries as stale
+- ✅ Active queries automatically refetch
+- ✅ Overrides `staleTime` configuration
+- ✅ Prefix matching (default) - matches "todos", "todos"/1, etc.
+- ✅ Exact matching - only exact key match
+- ✅ Custom predicates - full control
+- ✅ Perfect for: after mutations, user actions, background sync
+- ✅ Targeted invalidation > manual cache updates
+
+**Use invalidation instead of manual cache manipulation for cleaner, more maintainable code!** 🚀
+
