@@ -21,6 +21,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [4. Query Retries](./4.%20Query%20Retries.md) - Configure retry behavior
 - [5. Query Options](./5.%20Query%20Options.md) - Reusable query configurations
 - [6. Parallel Queries](./6.%20Parallel%20Queries.md) - Execute multiple queries in parallel
+- [7. Dependent Queries](./7.%20Dependent%20Queries.md) - Serial queries that depend on previous results
 
 ## 🚀 Quick Start
 

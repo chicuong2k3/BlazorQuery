@@ -208,6 +208,13 @@ public class UseQuery<T> : IDisposable
     /// </summary>
     public async Task ExecuteAsync(CancellationToken? signal = null, bool isRefetch = false)
     {
+        // If query is disabled, don't execute
+        if (!_queryOptions.Enabled)
+        {
+            FetchStatus = FetchStatus.Idle;
+            return;
+        }
+
         await _fetchLock.WaitAsync();
         CancellationTokenSource? linkedCts = null;
 
