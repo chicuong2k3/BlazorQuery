@@ -2,14 +2,14 @@ imp# Parallel Queries Implementation - Summary
 
 ## 🎯 Status: Implemented ✅
 
-BlazorQuery đã có implementation cho **Parallel Queries**, bao gồm cả `UseQueries` class.
+SwrSharp đã có implementation cho **Parallel Queries**, bao gồm cả `UseQueries` class.
 
 ---
 
 ## ✅ Những gì đã có sẵn:
 
 ### 1. **UseQueries<T> Class** ✅
-**File**: `src/BlazorQuery.Core/UseQueries.cs`
+**File**: `src/SwrSharp.Core/UseQueries.cs`
 
 ```csharp
 public class UseQueries<T> : IDisposable
@@ -32,7 +32,7 @@ public class UseQueries<T> : IDisposable
 - ✅ Support for refetching all queries
 
 ### 2. **Non-Generic UseQueries** ✅
-**File**: `src/BlazorQuery.Core/UseQueries.cs`
+**File**: `src/SwrSharp.Core/UseQueries.cs`
 
 ```csharp
 public class UseQueries : IDisposable
@@ -73,7 +73,7 @@ public class UseQueries : IDisposable
 - Factory pattern for reusable queries
 
 ### 2. **Tests** ✅
-**File**: `tests/BlazorQuery.Core.Tests/UseQueriesTests.cs`
+**File**: `tests/SwrSharp.Core.Tests/UseQueriesTests.cs`
 
 **Test coverage**:
 - ✅ Execute multiple queries in parallel
@@ -88,7 +88,7 @@ public class UseQueries : IDisposable
 - ✅ Different staleTime per query
 
 ### 3. **Added Convenience Properties** ✅
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 Added to match React Query API:
 ```csharp
@@ -116,7 +116,7 @@ const usersQuery = useQuery({ queryKey: ['users'], queryFn: fetchUsers })
 const teamsQuery = useQuery({ queryKey: ['teams'], queryFn: fetchTeams })
 ```
 
-**BlazorQuery**:
+**SwrSharp**:
 ```csharp
 var usersQuery = new UseQuery<List<User>>(
     new QueryOptions<List<User>>(
@@ -153,7 +153,7 @@ const userQueries = useQueries({
 })
 ```
 
-**BlazorQuery**:
+**SwrSharp**:
 ```csharp
 var userQueries = new UseQueries<User>(queryClient);
 userQueries.SetQueries(
@@ -301,7 +301,7 @@ Tests created in `UseQueriesTests.cs` appear to hang during execution. Possible 
 
 **React Query Parity**: ✅ **Achieved**
 
-BlazorQuery now supports parallel queries just like React Query, with:
+SwrSharp now supports parallel queries just like React Query, with:
 - Manual parallel queries
 - Dynamic parallel queries with `UseQueries`
 - Same mental model and patterns

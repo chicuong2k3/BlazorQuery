@@ -10,7 +10,7 @@ Comprehensive documentation about using `enabled` option to control when queries
 
 ### **File**: `9. Disabling Queries.md`
 
-Complete guide covering all aspects of disabling and pausing queries in BlazorQuery.
+Complete guide covering all aspects of disabling and pausing queries in SwrSharp.
 
 ---
 
@@ -64,7 +64,7 @@ Complete guide covering all aspects of disabling and pausing queries in BlazorQu
 - Platform adaptations
 
 ### 10. **Note on skipToken** ✅
-- Explanation why BlazorQuery doesn't need it
+- Explanation why SwrSharp doesn't need it
 - C# alternatives with nullable types
 - Type-safe conditional queries
 
@@ -159,7 +159,7 @@ await query.ExecuteAsync();
 
 ## 📊 React Query Parity
 
-| Feature | React Query | BlazorQuery | Status |
+| Feature | React Query | SwrSharp | Status |
 |---------|-------------|-------------|--------|
 | `enabled` option | ✓ | ✓ | ✅ Same |
 | Disabled with cache = Success | ✓ | ✓ | ✅ Same |
@@ -257,7 +257,7 @@ Developers can now:
 
 **Completes Feature Set**: 
 
-BlazorQuery now has complete documentation for:
+SwrSharp now has complete documentation for:
 1. Query Keys ✅
 2. Query Functions ✅
 3. Network Mode ✅

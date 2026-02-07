@@ -65,7 +65,7 @@ queryFn started → [Offline detected] → ???
 - `fetch()` API tự động aware network status
 - Browser có thể pause HTTP request mid-flight
 
-**BlazorQuery (.NET)**:
+**SwrSharp (.NET)**:
 - `HttpClient` KHÔNG tự động pause khi offline
 - Phải rely vào `CancellationToken` để cancel
 - KHÔNG thể pause .NET requests mid-flight

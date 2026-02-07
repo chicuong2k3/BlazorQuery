@@ -68,7 +68,7 @@ Side-by-side comparison showing how C# pattern achieves the same goals
 - ✅ Added "Reusable Query Options" example section
 - ✅ Shows factory method pattern in quick start
 
-### 2. **`tests/BlazorQuery.Core.Tests/UseQueryTests.cs`**
+### 2. **`tests/SwrSharp.Core.Tests/UseQueryTests.cs`**
 - ✅ Added test `ReusableQueryOptions_WorksCorrectly`
 - ✅ Demonstrates factory method pattern
 - ✅ Verifies it works with multiple instances
@@ -81,7 +81,7 @@ Side-by-side comparison showing how C# pattern achieves the same goals
 
 ---
 
-## 🆚 React Query vs BlazorQuery
+## 🆚 React Query vs SwrSharp
 
 ### React Query (TypeScript):
 ```typescript
@@ -98,7 +98,7 @@ function groupOptions(id: number) {
 useQuery(groupOptions(1))
 ```
 
-### BlazorQuery (C#):
+### SwrSharp (C#):
 ```csharp
 // No import needed - just use QueryOptions directly
 
@@ -125,7 +125,7 @@ var query = new UseQuery<Group>(GroupOptions(1), queryClient);
 - Need explicit return type annotation
 - Helper provides better IntelliSense
 
-### BlazorQuery doesn't need it because:
+### SwrSharp doesn't need it because:
 - ✅ C# has better type inference
 - ✅ `QueryOptions<T>` constructor is already typed
 - ✅ Factory methods are idiomatic C#
@@ -293,5 +293,5 @@ Pattern tương tự React Query nhưng sử dụng native C# idioms!
 
 ---
 
-**✨ BlazorQuery giờ đây có documentation đầy đủ về Reusable Query Options pattern, giúp developers organize code tốt hơn và maintain dễ dàng hơn!**
+**✨ SwrSharp giờ đây có documentation đầy đủ về Reusable Query Options pattern, giúp developers organize code tốt hơn và maintain dễ dàng hơn!**
 

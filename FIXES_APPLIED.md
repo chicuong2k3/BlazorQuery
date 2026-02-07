@@ -1,7 +1,7 @@
-# BlazorQuery - Các vấn đề đã được sửa chữa
+# SwrSharp - Các vấn đề đã được sửa chữa
 
 ## Tổng quan
-Sau khi kiểm tra implementation hiện tại của BlazorQuery và so sánh với React Query, đã tìm thấy và sửa chữa các vấn đề sau:
+Sau khi kiểm tra implementation hiện tại của SwrSharp và so sánh với React Query, đã tìm thấy và sửa chữa các vấn đề sau:
 
 ---
 
@@ -120,7 +120,7 @@ else if (_queryOptions.Retry.HasValue && attempt < _queryOptions.Retry.Value)
 ### Kết luận
 **KHÔNG SAI** - Implementation này khác với React Query nhưng là design choice:
 - React Query: `retry: 3` = 3 lần retry SAU lần đầu = 4 attempts tổng cộng
-- BlazorQuery: `retry: 3` = tối đa 3 attempts tổng cộng
+- SwrSharp: `retry: 3` = tối đa 3 attempts tổng cộng
 - Tests đều pass với behavior này, nên giữ nguyên
 - Documentation đã mô tả rõ behavior này
 
@@ -145,7 +145,7 @@ Passed!  - Failed:     0, Passed:    40, Skipped:     0, Total:    40
 
 ## 📝 Các thay đổi code
 
-### File: `src/BlazorQuery.Core/UseQuery.cs`
+### File: `src/SwrSharp.Core/UseQuery.cs`
 
 1. **QueryStatus property** (lines 61-70): Refactored thành computed property rõ ràng hơn
 2. **IsLoading property** (lines 75-77): Fixed logic để bao gồm Paused state
@@ -216,7 +216,7 @@ Passed!  - Failed:     0, Passed:    40, Skipped:     0, Total:    40
 
 ## 🎯 Kết luận
 
-BlazorQuery hiện tại đã **implement đúng** các concept cốt lõi của React Query:
+SwrSharp hiện tại đã **implement đúng** các concept cốt lõi của React Query:
 - ✅ Query status management (pending/error/success)
 - ✅ Loading states (isLoading, isFetching, isPaused)
 - ✅ Network modes (Online, Offline, Always, OfflineFirst)

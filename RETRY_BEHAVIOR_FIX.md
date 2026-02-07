@@ -8,7 +8,7 @@ Match React Query retry behavior **exactly**: `retry: N` means **N retries AFTER
 ## ✅ Changes Made
 
 ### 1. **Fixed Retry Logic** 
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 #### Before (WRONG):
 ```csharp
@@ -41,7 +41,7 @@ for (;;)
 ---
 
 ### 2. **Fixed Retry Delay**
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 #### Before:
 ```csharp
@@ -65,7 +65,7 @@ delayMs = (int)Math.Min(expDelay, maxRetryDelay.TotalMilliseconds);
 ---
 
 ### 3. **Added FailureReason Property**
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 ```csharp
 /// <summary>
@@ -93,7 +93,7 @@ Matches React Query's `failureReason` response property.
 ---
 
 ### 5. **Fixed Tests**
-**File**: `tests/BlazorQuery.Core.Tests/UseQueryRetryTests.cs`
+**File**: `tests/SwrSharp.Core.Tests/UseQueryRetryTests.cs`
 
 #### Test: `Retry_ShouldRetrySpecifiedTimes`
 ```csharp
@@ -117,7 +117,7 @@ Assert.Equal(4, count); // Initial + 3 retries = 4 attempts ✓
 
 ### ✅ NOW MATCHES:
 
-| Feature | React Query | BlazorQuery (Before) | BlazorQuery (After) |
+| Feature | React Query | SwrSharp (Before) | SwrSharp (After) |
 |---------|-------------|---------------------|---------------------|
 | `retry: 3` | 4 attempts (1+3) | ❌ 3 attempts | ✅ 4 attempts (1+3) |
 | `retry: 6` | 7 attempts (1+6) | ❌ 6 attempts | ✅ 7 attempts (1+6) |
@@ -252,7 +252,7 @@ query.OnChange += () => {
 
 ## ✨ Result
 
-**BlazorQuery now matches React Query retry behavior EXACTLY!**
+**SwrSharp now matches React Query retry behavior EXACTLY!**
 
 - ✅ Same retry count logic
 - ✅ Same retry delay formula  

@@ -103,7 +103,7 @@ Theo `.github/copilot-instructions.md`, khi sửa code phải:
 3. `FIXES_APPLIED.md` - Added documentation section
 
 ### Previously Fixed (Code):
-1. `src/BlazorQuery.Core/UseQuery.cs` - QueryStatus, IsLoading, Random.Shared
+1. `src/SwrSharp.Core/UseQuery.cs` - QueryStatus, IsLoading, Random.Shared
 
 ## 🚀 Next Steps
 

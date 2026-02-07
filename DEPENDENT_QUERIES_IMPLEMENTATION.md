@@ -10,7 +10,7 @@ Implemented the `enabled` option to control when queries execute, allowing queri
 
 ### 1. **Added `Enabled` Property to QueryOptions** ✅
 
-**File**: `src/BlazorQuery.Core/QueryOptions.cs`
+**File**: `src/SwrSharp.Core/QueryOptions.cs`
 
 ```csharp
 public class QueryOptions<T>
@@ -37,7 +37,7 @@ public class QueryOptions<T>
 
 ### 2. **Updated UseQuery to Respect `Enabled`** ✅
 
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 ```csharp
 public async Task ExecuteAsync(CancellationToken? signal = null, bool isRefetch = false)
@@ -61,7 +61,7 @@ public async Task ExecuteAsync(CancellationToken? signal = null, bool isRefetch 
 
 ### 3. **Created Comprehensive Tests** ✅
 
-**File**: `tests/BlazorQuery.Core.Tests/DependentQueriesTests.cs`
+**File**: `tests/SwrSharp.Core.Tests/DependentQueriesTests.cs`
 
 **Test Coverage** (9 tests):
 1. ✅ `DependentQuery_ShouldNotExecuteWhenDisabled` - Verify disabled queries don't execute
@@ -98,7 +98,7 @@ Added link to Dependent Queries documentation.
 
 ## 📊 React Query Parity
 
-| Feature | React Query | BlazorQuery | Status |
+| Feature | React Query | SwrSharp | Status |
 |---------|-------------|-------------|--------|
 | `enabled` option | ✓ | `enabled` parameter | ✅ Same |
 | Query won't execute when disabled | ✓ | ✓ | ✅ Same |
@@ -255,11 +255,11 @@ Time: 0ms ----------- 100ms
 ## 📋 Files Changed
 
 ### Source Code:
-1. ✅ `src/BlazorQuery.Core/QueryOptions.cs` - Added `enabled` parameter and property
-2. ✅ `src/BlazorQuery.Core/UseQuery.cs` - Check `Enabled` before executing
+1. ✅ `src/SwrSharp.Core/QueryOptions.cs` - Added `enabled` parameter and property
+2. ✅ `src/SwrSharp.Core/UseQuery.cs` - Check `Enabled` before executing
 
 ### Tests:
-3. ✅ `tests/BlazorQuery.Core.Tests/DependentQueriesTests.cs` - 9 comprehensive tests
+3. ✅ `tests/SwrSharp.Core.Tests/DependentQueriesTests.cs` - 9 comprehensive tests
 
 ### Documentation:
 4. ✅ `7. Dependent Queries.md` - Complete guide with examples

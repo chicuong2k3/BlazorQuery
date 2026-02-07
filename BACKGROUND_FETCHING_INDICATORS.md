@@ -19,7 +19,7 @@ These were already implemented. Enhanced with global tracking.
 
 ### 2. **Global Fetching Indicator** ✅ (NEW)
 
-**File**: `src/BlazorQuery.Core/QueryClient.cs`
+**File**: `src/SwrSharp.Core/QueryClient.cs`
 
 ```csharp
 public class QueryClient
@@ -49,7 +49,7 @@ public class QueryClient
 
 ### 3. **UseQuery Integration** ✅
 
-**File**: `src/BlazorQuery.Core/UseQuery.cs`
+**File**: `src/SwrSharp.Core/UseQuery.cs`
 
 ```csharp
 // When fetch starts
@@ -72,7 +72,7 @@ if (FetchStatus != FetchStatus.Paused)
 
 ### 4. **Comprehensive Tests** ✅
 
-**File**: `tests/BlazorQuery.Core.Tests/BackgroundFetchingIndicatorsTests.cs`
+**File**: `tests/SwrSharp.Core.Tests/BackgroundFetchingIndicatorsTests.cs`
 
 **Test Coverage** (12 tests):
 1. ✅ `IsFetching_ShouldBeTrueWhenQueryIsFetching` - Individual query state
@@ -110,7 +110,7 @@ Added link to Background Fetching Indicators documentation.
 
 ## 📊 React Query Parity
 
-| Feature | React Query | BlazorQuery | Status |
+| Feature | React Query | SwrSharp | Status |
 |---------|-------------|-------------|--------|
 | Individual `isFetching` | ✓ | `IsFetching` property | ✅ Same |
 | Global `useIsFetching` | ✓ Hook | `QueryClient.IsFetching` property | ✅ Equivalent |
@@ -227,11 +227,11 @@ await Task.WhenAll(
 ## 📁 Files Modified/Created
 
 ### Source Code:
-1. ✅ `src/BlazorQuery.Core/QueryClient.cs` - Added global tracking
-2. ✅ `src/BlazorQuery.Core/UseQuery.cs` - Integrated tracking calls
+1. ✅ `src/SwrSharp.Core/QueryClient.cs` - Added global tracking
+2. ✅ `src/SwrSharp.Core/UseQuery.cs` - Integrated tracking calls
 
 ### Tests:
-3. ✅ `tests/BlazorQuery.Core.Tests/BackgroundFetchingIndicatorsTests.cs` - 12 comprehensive tests
+3. ✅ `tests/SwrSharp.Core.Tests/BackgroundFetchingIndicatorsTests.cs` - 12 comprehensive tests
 
 ### Documentation:
 4. ✅ `8. Background Fetching Indicators.md` - Complete guide
@@ -320,7 +320,7 @@ const isFetching = useIsFetching()
 return isFetching ? <GlobalSpinner /> : null
 ```
 
-### BlazorQuery (C#):
+### SwrSharp (C#):
 ```csharp
 // Individual
 var query = new UseQuery<Data>(options, client);
