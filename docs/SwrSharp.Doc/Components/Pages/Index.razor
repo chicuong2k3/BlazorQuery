@@ -1,0 +1,40 @@
+@page "/"
+@layout MainLayout
+
+<div class="flex-1 flex flex-col justify-center items-center py-20">
+    <div class="text-center max-w-2xl mx-auto px-4">
+        <h1 class="text-6xl font-bold text-gray-900 mb-4">SwrSharp</h1>
+        <p class="text-2xl text-gray-600 mb-8">
+            Powerful asynchronous state management, caching, and data synchronization for Blazor
+        </p>
+        
+        <div class="flex gap-4 justify-center mb-12">
+            <a href="/docs/getting-started/overview" class="px-8 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition font-medium">
+                Get Started →
+            </a>
+            <a href="https://github.com/chicuong/SwrSharp" target="_blank" class="px-8 py-3 border border-gray-300 text-gray-900 rounded-lg hover:border-gray-400 transition font-medium">
+                View on GitHub
+            </a>
+        </div>
+
+        <div class="grid grid-cols-3 gap-8 mt-16">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">🚀 Fast</h3>
+                <p class="text-gray-600">Intelligent caching and background refetching keep your app responsive</p>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">🔄 Reliable</h3>
+                <p class="text-gray-600">Smart retry logic and network mode handling for robust data fetching</p>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">⚡ Developer-Friendly</h3>
+                <p class="text-gray-600">Type-safe API inspired by TanStack Query for React</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+}
+

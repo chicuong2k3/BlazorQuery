@@ -1,0 +1,181 @@
+
+<nav class="fixed left-0 top-0 h-screen w-64 bg-[#0d1117] text-white overflow-y-auto border-r border-gray-800">
+    <!-- Header -->
+    <div class="p-4 border-b border-gray-800">
+        <div class="flex items-center gap-2 mb-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-red-500 to-yellow-500 rounded"></div>
+            <div>
+                <h1 class="text-lg font-bold">
+                    <a href="/" class="hover:text-red-400 transition">SWRSHARP</a>
+                </h1>
+                <span class="text-xs text-gray-500">v5</span>
+            </div>
+        </div>
+        
+        <!-- Search Box -->
+        <div class="relative">
+            <input 
+                type="text" 
+                placeholder="Search..." 
+                class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
+            />
+            <span class="absolute right-3 top-2 text-xs text-gray-500">⌘K</span>
+        </div>
+    </div>
+
+    <!-- Menu Items -->
+    <div class="px-3 py-4 space-y-6">
+        <!-- Getting Started -->
+        <div>
+            <h3 class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Getting Started</h3>
+            <ul class="space-y-0.5">
+                <li>
+                    <NavLink href="/docs/getting-started/overview" class="block px-2 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Overview
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/getting-started/installation" class="block px-2 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Installation
+                    </NavLink>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Guides & Concepts -->
+        <div>
+            <h3 class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Guides & Concepts</h3>
+            <ul class="space-y-0.5 text-sm">
+                <li>
+                    <NavLink href="/docs/guides/query-keys" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Keys
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/query-functions" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Functions
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/network-mode" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Network Mode
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/query-retries" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Retries
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/query-options" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Options
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/parallel-queries" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Parallel Queries
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/dependent-queries" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Dependent Queries
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/background-fetching" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Background Fetching
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/disabling-queries" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Disabling Queries
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/window-focus-refetching" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Window Focus Refetching
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/initial-query-data" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Initial Query Data
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/placeholder-query-data" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Placeholder Query Data
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/paginated-queries" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Paginated Queries
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/infinite-queries" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Infinite Queries
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/query-invalidation" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Invalidation
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/filters" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Filters
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/query-cancellation" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Cancellation
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/guides/important-defaults" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-red-400 bg-gray-800 font-medium">
+                        Important Defaults
+                    </NavLink>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Concepts -->
+        <div>
+            <h3 class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Concepts</h3>
+            <ul class="space-y-0.5 text-sm">
+                <li>
+                    <NavLink href="/docs/concepts/query-concepts" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        Query Concepts
+                    </NavLink>
+                </li>
+            </ul>
+        </div>
+
+        <!-- API Reference -->
+        <div>
+            <h3 class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">API Reference</h3>
+            <ul class="space-y-0.5 text-sm">
+                <li>
+                    <NavLink href="/docs/api/use-query" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        UseQuery
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/api/use-infinite-query" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        UseInfiniteQuery
+                    </NavLink>
+                </li>
+                <li>
+                    <NavLink href="/docs/api/query-client" class="block px-2 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition" ActiveClass="text-white bg-gray-800 font-medium">
+                        QueryClient
+                    </NavLink>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+@code {
+
+}
+

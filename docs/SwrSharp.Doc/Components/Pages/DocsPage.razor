@@ -1,0 +1,86 @@
+@layout MainLayout
+
+@page "/docs/getting-started/{**route}"
+@page "/docs/guides/{**route}"
+@page "/docs/concepts/{**route}"
+@page "/docs/api/{**route}"
+@using BlazorStatic.Services
+@inject BlazorStaticContentService<DocFrontMatter> ContentService
+
+<article class="ml-64 max-w-4xl mx-auto p-8 text-gray-300">
+    @if (Post == null)
+    {
+        <div class="text-center py-12">
+            <h1 class="text-2xl font-bold text-white">Page not found</h1>
+            <p class="text-gray-400 mt-2">The documentation page you're looking for doesn't exist.</p>
+            <a href="/docs/getting-started/overview" class="text-red-400 hover:text-red-300 mt-4 inline-block">
+                ← Back to Overview
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">@Post.FrontMatter.Title</h1>
+            <p class="text-gray-400">@Post.FrontMatter.Description</p>
+        </div>
+
+        <div class="prose prose-invert prose-red max-w-none">
+            @((MarkupString)Post.HtmlContent)
+        </div>
+
+        <div class="mt-12 pt-8 border-t border-gray-800">
+            <nav class="flex justify-between">
+                @if (PreviousPost != null)
+                {
+                    <a href="@PreviousPost.Url" class="text-red-400 hover:text-red-300 font-medium transition">
+                        ← @PreviousPost.FrontMatter.Title
+                    </a>
+                }
+                else
+                {
+                    <div></div>
+                }
+
+                @if (NextPost != null)
+                {
+                    <a href="@NextPost.Url" class="text-red-400 hover:text-red-300 font-medium transition">
+                        @NextPost.FrontMatter.Title →
+                    </a>
+                }
+            </nav>
+        </div>
+    }
+</article>
+
+@code {
+    [Parameter]
+    public string Route { get; set; } = "";
+
+    private Post<DocFrontMatter>? Post { get; set; }
+    private Post<DocFrontMatter>? PreviousPost { get; set; }
+    private Post<DocFrontMatter>? NextPost { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Build the URL based on the route
+        var url = $"/docs/{Route}";
+        
+        // Find the post
+        Post = ContentService.Posts.FirstOrDefault(p => p.Url.EndsWith(url));
+
+        if (Post != null)
+        {
+            var index = ContentService.Posts.IndexOf(Post);
+            if (index > 0)
+            {
+                PreviousPost = ContentService.Posts[index - 1];
+            }
+            if (index < ContentService.Posts.Count - 1)
+            {
+                NextPost = ContentService.Posts[index + 1];
+            }
+        }
+    }
+}
+

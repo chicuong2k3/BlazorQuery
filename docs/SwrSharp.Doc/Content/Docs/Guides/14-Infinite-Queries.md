@@ -1,0 +1,469 @@
+---
+title: "Infinite Queries"
+description: "Guide for Infinite Queries in SwrSharp"
+order: 14
+category: "Guides"
+---
+# Infinite Queries
+
+Rendering lists that can additively "load more" data onto an existing set of data or "infinite scroll" is a very common UI pattern. SwrSharp supports infinite queries through the `UseInfiniteQuery` class for querying these types of lists.
+
+When using `UseInfiniteQuery`, you'll notice a few things are different:
+
+- `Data` is now an object containing infinite query data:
+  - `Data.Pages` - list containing the fetched pages
+  - `Data.PageParams` - list containing the page params used to fetch the pages
+- `FetchNextPageAsync()` and `FetchPreviousPageAsync()` methods are available
+- `InitialPageParam` option is required to specify the initial page param
+- `GetNextPageParam` and `GetPreviousPageParam` options determine if there is more data to load
+- `HasNextPage` boolean is `true` if `GetNextPageParam` returns non-null
+- `HasPreviousPage` boolean is `true` if `GetPreviousPageParam` returns non-null
+- `IsFetchingNextPage` and `IsFetchingPreviousPage` booleans distinguish between background refresh and loading more
+
+## Example: Cursor-Based Pagination
+
+Let's assume we have an API that returns pages of projects 3 at a time based on a cursor index:
+
+```
+/api/projects?cursor=0  → { data: [...], nextCursor: 3 }
+/api/projects?cursor=3  → { data: [...], nextCursor: 6 }
+/api/projects?cursor=6  → { data: [...], nextCursor: 9 }
+/api/projects?cursor=9  → { data: [...], nextCursor: null }
+```
+
+## Complete Example
+
+```csharp
+public class InfiniteProjectsComponent : IDisposable
+{
+    private readonly QueryClient _queryClient;
+    private UseInfiniteQuery<ProjectsPage, int>? _query;
+
+    public InfiniteProjectsComponent(QueryClient queryClient)
+    {
+        _queryClient = queryClient;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _query = new UseInfiniteQuery<ProjectsPage, int>(
+            new InfiniteQueryOptions<ProjectsPage, int>(
+                queryKey: new("projects"),
+                queryFn: async (ctx, pageParam) => {
+                    // Fetch projects with cursor
+                    return await FetchProjectsAsync(pageParam);
+                },
+                initialPageParam: 0, // Start from cursor 0 (required)
+                getNextPageParam: (lastPage, allPages, lastPageParam) => {
+                    // Return next cursor or null if no more
+                    return lastPage.NextCursor;
+                }
+            ),
+            _queryClient
+        );
+
+        _query.OnChange += RenderUI;
+
+        // Load first page
+        await _query.ExecuteAsync();
+    }
+
+    private void RenderUI()
+    {
+        if (_query == null) return;
+
+        if (_query.IsPending)
+        {
+            Console.WriteLine("Loading first page...");
+            return;
+        }
+
+        if (_query.IsError)
+        {
+            Console.WriteLine($"Error: {_query.Error?.Message}");
+            return;
+        }
+
+        // Render all pages
+        Console.WriteLine("=== Projects ===");
+        foreach (var page in _query.Data.Pages)
+        {
+            foreach (var project in page.Projects)
+            {
+                Console.WriteLine($"- {project.Name}");
+            }
+        }
+
+        // Load more button
+        if (_query.IsFetchingNextPage)
+        {
+            Console.WriteLine("Loading more...");
+        }
+        else if (_query.HasNextPage)
+        {
+            Console.WriteLine("[Load More]");
+        }
+        else
+        {
+            Console.WriteLine("Nothing more to load");
+        }
+
+        // Background refresh indicator
+        if (_query.IsFetching && !_query.IsFetchingNextPage)
+        {
+            Console.WriteLine("🔄 Refreshing...");
+        }
+    }
+
+    public async Task LoadMoreAsync()
+    {
+        if (_query == null || !_query.HasNextPage || _query.IsFetching)
+            return;
+
+        await _query.FetchNextPageAsync();
+    }
+
+    public void Dispose()
+    {
+        _query?.Dispose();
+        _queryClient?.Dispose();
+    }
+}
+
+// Data models
+public class ProjectsPage
+{
+    public List<Project> Projects { get; set; } = new();
+    public int? NextCursor { get; set; }
+}
+
+public class Project
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+```
+
+## Key Properties and Methods
+
+### Data Structure
+
+```csharp
+// InfiniteData<TData>
+query.Data.Pages      // List<TData> - all fetched pages
+query.Data.PageParams // List<object?> - params used to fetch each page
+```
+
+### Navigation
+
+```csharp
+// Fetch next page
+await query.FetchNextPageAsync();
+
+// Fetch previous page  
+await query.FetchPreviousPageAsync();
+
+// Refetch all pages
+await query.RefetchAsync();
+```
+
+### State Flags
+
+```csharp
+query.HasNextPage            // bool - can load more forward
+query.HasPreviousPage        // bool - can load more backward
+query.IsFetchingNextPage     // bool - loading next page
+query.IsFetchingPreviousPage // bool - loading previous page
+query.IsFetching            // bool - any fetch in progress
+```
+
+## Important: Preventing Concurrent Fetches
+
+Calling `FetchNextPageAsync()` while a fetch is in progress can cause data overwrites. Always check `IsFetching`:
+
+```csharp
+// ✅ Good: Check before fetching
+if (query.HasNextPage && !query.IsFetching)
+{
+    await query.FetchNextPageAsync();
+}
+
+// ❌ Bad: No check
+await query.FetchNextPageAsync(); // Might overwrite data!
+```
+
+For infinite scroll:
+
+```csharp
+private async Task OnScrollReachedEnd()
+{
+    // Check both conditions
+    if (_query.HasNextPage && !_query.IsFetching)
+    {
+        await _query.FetchNextPageAsync();
+    }
+}
+```
+
+## Refetching Behavior
+
+When an infinite query needs to be refetched (e.g., becomes stale), **each page is fetched sequentially** starting from the first one. This ensures data consistency and avoids duplicates or skipped records due to stale cursors.
+
+```csharp
+// User has loaded pages 0, 3, 6
+// Data becomes stale, refetch is triggered
+await query.RefetchAsync();
+
+// Refetches sequentially:
+// 1. Page with cursor 0
+// 2. Page with cursor 3
+// 3. Page with cursor 6
+```
+
+## Bi-Directional Infinite Lists
+
+Implement bi-directional scrolling with `GetPreviousPageParam`:
+
+```csharp
+var query = new UseInfiniteQuery<ProjectsPage, int>(
+    new InfiniteQueryOptions<ProjectsPage, int>(
+        queryKey: new("projects"),
+        queryFn: async (ctx, pageParam) => await FetchProjectsAsync(pageParam),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages, lastPageParam) => 
+            lastPage.NextCursor,
+        getPreviousPageParam: (firstPage, allPages, firstPageParam) => 
+            firstPage.PrevCursor
+    ),
+    _queryClient
+);
+
+// Load newer content
+await query.FetchNextPageAsync();
+
+// Load older content
+await query.FetchPreviousPageAsync();
+```
+
+## Limiting Pages with `maxPages`
+
+Limit the number of pages kept in memory for performance:
+
+```csharp
+var query = new UseInfiniteQuery<ProjectsPage, int>(
+    new InfiniteQueryOptions<ProjectsPage, int>(
+        queryKey: new("projects"),
+        queryFn: async (ctx, pageParam) => await FetchProjectsAsync(pageParam),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages, lastPageParam) => 
+            lastPage.NextCursor,
+        getPreviousPageParam: (firstPage, allPages, firstPageParam) => 
+            firstPage.PrevCursor,
+        maxPages: 3 // Keep only 3 pages in memory
+    ),
+    _queryClient
+);
+
+// After loading 5 pages, only the latest 3 are kept
+// Reduces memory usage
+// Reduces refetch time (only 3 pages refetched)
+```
+
+## Page Param Calculation
+
+If your API doesn't return a cursor, calculate it from the page param:
+
+```csharp
+var query = new UseInfiniteQuery<List<Project>, int>(
+    new InfiniteQueryOptions<List<Project>, int>(
+        queryKey: new("projects"),
+        queryFn: async (ctx, pageParam) => 
+            await FetchProjectsAsync(page: pageParam),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages, lastPageParam) => {
+            // Return null if no more data
+            if (lastPage.Count == 0)
+                return null;
+            
+            // Increment page number
+            return lastPageParam + 1;
+        },
+        getPreviousPageParam: (firstPage, allPages, firstPageParam) => {
+            // Return null if at first page
+            if (firstPageParam <= 0)
+                return null;
+            
+            // Decrement page number
+            return firstPageParam - 1;
+        }
+    ),
+    _queryClient
+);
+```
+
+## Manual Data Manipulation
+
+Update infinite query data manually:
+
+### Remove First Page
+
+```csharp
+var data = query.Data;
+data.Pages.RemoveAt(0);
+data.PageParams.RemoveAt(0);
+```
+
+### Remove Single Item
+
+```csharp
+foreach (var page in query.Data.Pages)
+{
+    page.Projects.RemoveAll(p => p.Id == deletedId);
+}
+```
+
+### Keep Only First Page
+
+```csharp
+var data = query.Data;
+data.Pages = data.Pages.Take(1).ToList();
+data.PageParams = data.PageParams.Take(1).ToList();
+```
+
+**Important**: Always maintain the same structure of `Pages` and `PageParams`!
+
+## Concurrent Fetches with `cancelRefetch`
+
+By default, `FetchNextPageAsync` prevents concurrent fetches. Use `cancelRefetch: false` to allow:
+
+```csharp
+// Default: prevents concurrent fetches
+await query.FetchNextPageAsync(); // If already fetching, does nothing
+
+// Allow concurrent (not recommended)
+await query.FetchNextPageAsync(cancelRefetch: false);
+```
+
+## Comparison with React Query
+
+### React Query (TypeScript):
+```typescript
+const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = 
+  useInfiniteQuery({
+    queryKey: ['projects'],
+    queryFn: async ({ pageParam }) => {
+      const res = await fetch('/api/projects?cursor=' + pageParam)
+      return res.json()
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  })
+
+// Render
+data.pages.map(page => 
+  page.data.map(project => <div>{project.name}</div>)
+)
+
+// Load more
+<button onClick={() => fetchNextPage()} disabled={!hasNextPage}>
+  Load More
+</button>
+```
+
+### SwrSharp (C#):
+```csharp
+var query = new UseInfiniteQuery<ProjectsPage, int>(
+    new InfiniteQueryOptions<ProjectsPage, int>(
+        queryKey: new("projects"),
+        queryFn: async (ctx, pageParam) => {
+            return await FetchProjectsAsync(pageParam);
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages, lastPageParam) => 
+            lastPage.NextCursor
+    ),
+    queryClient
+);
+
+// Render
+foreach (var page in query.Data.Pages)
+{
+    foreach (var project in page.Projects)
+        Console.WriteLine(project.Name);
+}
+
+// Load more
+if (query.HasNextPage && !query.IsFetching)
+{
+    await query.FetchNextPageAsync();
+}
+```
+
+## Best Practices
+
+### 1. **Always Check IsFetching**
+```csharp
+// ✅ Good
+if (query.HasNextPage && !query.IsFetching)
+    await query.FetchNextPageAsync();
+
+// ❌ Bad
+if (query.HasNextPage)
+    await query.FetchNextPageAsync(); // Can cause overwrites!
+```
+
+### 2. **Use MaxPages for Long Lists**
+```csharp
+// ✅ Good: Limit memory usage
+maxPages: 5
+
+// ❌ Bad: Unlimited pages (memory issues)
+// No maxPages
+```
+
+### 3. **Return null for No More Data**
+```csharp
+// ✅ Good
+getNextPageParam: (lastPage, allPages, lastPageParam) => {
+    if (lastPage.Items.Count == 0)
+        return null; // No more pages
+    return lastPage.NextCursor;
+}
+
+// ❌ Bad: Always returns cursor (infinite loop!)
+getNextPageParam: (lastPage, allPages, lastPageParam) => 
+    lastPageParam + 1 // Never stops!
+```
+
+### 4. **Handle Loading States**
+```csharp
+// ✅ Good: Different states
+if (query.IsPending)
+    return "Loading first page...";
+if (query.IsFetchingNextPage)
+    return "Loading more...";
+if (query.IsFetching)
+    return "Refreshing...";
+
+// ❌ Bad: Generic loading
+if (query.IsFetching)
+    return "Loading..."; // Can't distinguish states
+```
+
+---
+
+## Summary
+
+- ✅ `UseInfiniteQuery<TData, TPageParam>` for infinite scroll
+- ✅ `InitialPageParam` required
+- ✅ `GetNextPageParam` returns next cursor or null
+- ✅ `FetchNextPageAsync()` loads more data
+- ✅ `HasNextPage` indicates more data available
+- ✅ `IsFetchingNextPage` for loading state
+- ✅ Check `!IsFetching` before fetching
+- ✅ Sequential refetch for consistency
+- ✅ `MaxPages` limits memory usage
+- ✅ Bi-directional with `GetPreviousPageParam`
+
+**Perfect for**: Load more buttons, infinite scroll, chat messages, social media feeds! 🚀
+

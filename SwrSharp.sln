@@ -1,5 +1,4 @@
-﻿﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.3.11206.111 d18.3
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -19,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Core.Tests", "test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Core", "src\SwrSharp.Core\SwrSharp.Core.csproj", "{B649718C-8972-B9FF-ED7C-C1BEA841321C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Doc", "docs\SwrSharp.Doc\SwrSharp.Doc.csproj", "{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +34,10 @@ Global
 		{B649718C-8972-B9FF-ED7C-C1BEA841321C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B649718C-8972-B9FF-ED7C-C1BEA841321C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B649718C-8972-B9FF-ED7C-C1BEA841321C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
