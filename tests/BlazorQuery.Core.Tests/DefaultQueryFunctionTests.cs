@@ -5,13 +5,11 @@ public class DefaultQueryFunctionTests : IDisposable
     [Fact]
     public async Task DefaultQueryFn_ShouldBeUsedWhenNoQueryFnProvided()
     {
-        var client = new QueryClient
-        {
-            DefaultQueryFn = ctx => {
-                var key = ctx.QueryKey.Parts[0]?.ToString();
-                return Task.FromResult<object>(key == "data" ? "Default Data" : "Unknown");
-            }
-        };
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<string>(ctx => {
+            var key = ctx.QueryKey.Parts[0]?.ToString();
+            return Task.FromResult(key == "data" ? "Default Data" : "Unknown");
+        });
 
         var query = new UseQuery<string>(
             new QueryOptions<string>(
@@ -30,19 +28,17 @@ public class DefaultQueryFunctionTests : IDisposable
     [Fact]
     public async Task DefaultQueryFn_ShouldUseQueryKeyToDetermineFetch()
     {
-        var client = new QueryClient
-        {
-            DefaultQueryFn = ctx => {
-                // Use query key to determine what to fetch
-                var endpoint = ctx.QueryKey.Parts[0]?.ToString();
-                return Task.FromResult<object>(endpoint switch
-                {
-                    "/posts" => new List<string> { "Post 1", "Post 2" },
-                    "/users" => new List<string> { "User 1", "User 2" },
-                    _ => new List<string>()
-                });
-            }
-        };
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<List<string>>(ctx => {
+            // Use query key to determine what to fetch
+            var endpoint = ctx.QueryKey.Parts[0]?.ToString();
+            return Task.FromResult(endpoint switch
+            {
+                "/posts" => new List<string> { "Post 1", "Post 2" },
+                "/users" => new List<string> { "User 1", "User 2" },
+                _ => new List<string>()
+            });
+        });
 
         var postsQuery = new UseQuery<List<string>>(
             new QueryOptions<List<string>>(
@@ -74,10 +70,8 @@ public class DefaultQueryFunctionTests : IDisposable
     [Fact]
     public async Task ProvidedQueryFn_ShouldOverrideDefaultQueryFn()
     {
-        var client = new QueryClient
-        {
-            DefaultQueryFn = _ => Task.FromResult<object>("Default Data")
-        };
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<string>(_ => Task.FromResult("Default Data"));
 
         var query = new UseQuery<string>(
             new QueryOptions<string>(
@@ -96,29 +90,32 @@ public class DefaultQueryFunctionTests : IDisposable
     public void NoQueryFn_AndNoDefaultQueryFn_ShouldThrowException()
     {
         // No default query function set
+        var client = new QueryClient();
 
         Assert.Throws<InvalidOperationException>(() =>
         {
+            new UseQuery<string>(
+                new QueryOptions<string>(queryKey: new QueryKey("data")),
+                client
+            );
         });
     }
 
     [Fact]
     public async Task DefaultQueryFn_WithComplexQueryKey_ShouldWork()
     {
-        var client = new QueryClient
-        {
-            DefaultQueryFn = ctx => {
-                var endpoint = ctx.QueryKey.Parts[0]?.ToString();
-                var id = ctx.QueryKey.Parts.Count > 1 ? ctx.QueryKey.Parts[1] : null;
-                
-                if (endpoint == "/posts" && id is int postId)
-                {
-                    return Task.FromResult<object>($"Post {postId}");
-                }
-                
-                return Task.FromResult<object>("Unknown");
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<string>(ctx => {
+            var endpoint = ctx.QueryKey.Parts[0]?.ToString();
+            var id = ctx.QueryKey.Parts.Count > 1 ? ctx.QueryKey.Parts[1] : null;
+
+            if (endpoint == "/posts" && id is int postId)
+            {
+                return Task.FromResult($"Post {postId}");
             }
-        };
+
+            return Task.FromResult("Unknown");
+        });
 
         var query = new UseQuery<string>(
             new QueryOptions<string>(
@@ -135,19 +132,12 @@ public class DefaultQueryFunctionTests : IDisposable
     [Fact]
     public async Task DefaultQueryFn_WithDifferentTypes_ShouldWork()
     {
-        var client = new QueryClient
-        {
-            DefaultQueryFn = ctx => {
-                var key = ctx.QueryKey.Parts[0]?.ToString();
-                return Task.FromResult<object>(key switch
-                {
-                    "string" => "String Data",
-                    "int" => 42,
-                    "list" => new List<int> { 1, 2, 3 },
-                    _ => throw new Exception("Unknown key")
-                });
-            }
-        };
+        var client = new QueryClient();
+
+        // Register type-specific default functions for each type
+        client.SetDefaultQueryFn<string>(_ => Task.FromResult("String Data"));
+        client.SetDefaultQueryFn<int>(_ => Task.FromResult(42));
+        client.SetDefaultQueryFn<List<int>>(_ => Task.FromResult(new List<int> { 1, 2, 3 }));
 
         var stringQuery = new UseQuery<string>(
             new QueryOptions<string>(queryKey: new QueryKey("string")),
@@ -174,21 +164,19 @@ public class DefaultQueryFunctionTests : IDisposable
     }
 
     [Fact]
-    public async Task DefaultQueryFn_WrongReturnType_ShouldThrowException()
+    public void DefaultQueryFn_ForOneType_ShouldNotAffectOtherTypes()
     {
-        var client = new QueryClient
+        var client = new QueryClient();
+        // Only register default for string type
+        client.SetDefaultQueryFn<string>(_ => Task.FromResult("String Data"));
+
+        // Should throw for int since no default registered for int
+        Assert.Throws<InvalidOperationException>(() =>
         {
-            DefaultQueryFn = _ => Task.FromResult<object>("String Data")
-            // Returns string
-        };
-
-        var query = new UseQuery<int>( // Expects int
-            new QueryOptions<int>(queryKey: new QueryKey("data")),
-            client
-        );
-
-        await Assert.ThrowsAsync<InvalidCastException>(async () => {
-            await query.ExecuteAsync();
+            new UseQuery<int>(
+                new QueryOptions<int>(queryKey: new QueryKey("data")),
+                client
+            );
         });
     }
 
@@ -197,16 +185,12 @@ public class DefaultQueryFunctionTests : IDisposable
     {
         var fetchCount = 0;
 
-        Task<object> DefaultQueryFn(QueryFunctionContext ctx)
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<string>(_ =>
         {
             fetchCount++;
-            return Task.FromResult<object>("Data");
-        }
-
-        var client = new QueryClient
-        {
-            DefaultQueryFn = DefaultQueryFn
-        };
+            return Task.FromResult("Data");
+        });
 
         var query = new UseQuery<string>(
             new QueryOptions<string>(
@@ -226,16 +210,12 @@ public class DefaultQueryFunctionTests : IDisposable
     {
         var fetchCount = 0;
 
-        Task<object> DefaultQueryFn(QueryFunctionContext ctx)
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<string>(_ =>
         {
             fetchCount++;
-            return Task.FromResult<object>("Data");
-        }
-
-        var client = new QueryClient
-        {
-            DefaultQueryFn = DefaultQueryFn
-        };
+            return Task.FromResult("Data");
+        });
 
         var query1 = new UseQuery<string>(
             new QueryOptions<string>(
@@ -265,23 +245,21 @@ public class DefaultQueryFunctionTests : IDisposable
     public async Task DefaultQueryFn_Documentation_Example()
     {
         // Example from documentation: API endpoint based on query key
-        var client = new QueryClient
-        {
-            DefaultQueryFn = async ctx => {
-                var endpoint = ctx.QueryKey.Parts[0]?.ToString();
-                // Simulate API call based on endpoint
-                await Task.Delay(10);
-                
-                return endpoint switch
-                {
-                    "/posts" => new List<Post> { 
-                        new() { Title = "Post 1" },
-                        new() { Title = "Post 2" }
-                    },
-                    _ => new List<Post>()
-                };
-            }
-        };
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<List<Post>>(async ctx => {
+            var endpoint = ctx.QueryKey.Parts[0]?.ToString();
+            // Simulate API call based on endpoint
+            await Task.Delay(10);
+
+            return endpoint switch
+            {
+                "/posts" => new List<Post> {
+                    new() { Title = "Post 1" },
+                    new() { Title = "Post 2" }
+                },
+                _ => new List<Post>()
+            };
+        });
 
         // All you have to do now is pass a key!
         var query = new UseQuery<List<Post>>(
@@ -301,25 +279,23 @@ public class DefaultQueryFunctionTests : IDisposable
     [Fact]
     public async Task DefaultQueryFn_WithAnonymousObjectInKey_ShouldWork()
     {
-        var client = new QueryClient
-        {
-            DefaultQueryFn = ctx => {
-                var endpoint = ctx.QueryKey.Parts[0]?.ToString();
-                var filters = ctx.QueryKey.Parts.Count > 1 ? ctx.QueryKey.Parts[1] : null;
-                
-                if (endpoint == "/posts" && filters != null)
-                {
-                    var typeProp = filters.GetType().GetProperty("type");
-                    var type = typeProp?.GetValue(filters)?.ToString();
-                    
-                    return Task.FromResult<object>(type == "featured" 
-                        ? new List<string> { "Featured Post 1", "Featured Post 2" }
-                        : new List<string> { "Regular Post 1" });
-                }
-                
-                return Task.FromResult<object>(new List<string>());
+        var client = new QueryClient();
+        client.SetDefaultQueryFn<List<string>>(ctx => {
+            var endpoint = ctx.QueryKey.Parts[0]?.ToString();
+            var filters = ctx.QueryKey.Parts.Count > 1 ? ctx.QueryKey.Parts[1] : null;
+
+            if (endpoint == "/posts" && filters != null)
+            {
+                var typeProp = filters.GetType().GetProperty("type");
+                var type = typeProp?.GetValue(filters)?.ToString();
+
+                return Task.FromResult(type == "featured"
+                    ? new List<string> { "Featured Post 1", "Featured Post 2" }
+                    : new List<string> { "Regular Post 1" });
             }
-        };
+
+            return Task.FromResult(new List<string>());
+        });
 
         var query = new UseQuery<List<string>>(
             new QueryOptions<List<string>>(

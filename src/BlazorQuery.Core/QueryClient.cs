@@ -23,10 +23,39 @@ public class QueryClient : IDisposable
     public bool DefaultRefetchOnWindowFocus { get; set; } = true;
     
     /// <summary>
-    /// Default query function to use for all queries unless overridden.
-    /// The function receives the QueryKey and can determine what to fetch based on it.
+    /// Type-specific default query functions.
     /// </summary>
-    public Func<QueryFunctionContext, Task<object>>? DefaultQueryFn { get; set; }
+    private readonly ConcurrentDictionary<Type, object> _defaultQueryFns = new();
+
+    /// <summary>
+    /// Sets a type-specific default query function.
+    /// This provides type-safe default fetching without runtime casts.
+    /// </summary>
+    /// <typeparam name="T">The return type of the query function.</typeparam>
+    /// <param name="queryFn">The default query function for this type.</param>
+    public void SetDefaultQueryFn<T>(Func<QueryFunctionContext, Task<T>> queryFn)
+    {
+        _defaultQueryFns[typeof(T)] = queryFn;
+    }
+
+    /// <summary>
+    /// Gets the type-specific default query function if registered.
+    /// </summary>
+    /// <typeparam name="T">The expected return type.</typeparam>
+    /// <returns>The registered function or null if not found.</returns>
+    internal Func<QueryFunctionContext, Task<T>>? GetDefaultQueryFn<T>()
+    {
+        if (_defaultQueryFns.TryGetValue(typeof(T), out var fn))
+        {
+            return fn as Func<QueryFunctionContext, Task<T>>;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if a default query function is registered for the given type.
+    /// </summary>
+    internal bool HasDefaultQueryFn<T>() => _defaultQueryFns.ContainsKey(typeof(T));
     
     private int _fetchingQueriesCount = 0;
     

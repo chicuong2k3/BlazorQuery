@@ -121,85 +121,34 @@ public class UseQuery<T> : IDisposable
         _onlineManager = client.OnlineManager;
         FetchStatus = FetchStatus.Idle;
 
-        // Resolve QueryFn: use provided queryFn or fallback to default
+        // Resolve QueryFn: use provided queryFn or fallback to type-safe default
         if (_queryOptions.QueryFn == null)
         {
-            if (_client.DefaultQueryFn == null)
+            var defaultFn = _client.GetDefaultQueryFn<T>();
+            if (defaultFn == null)
             {
-                var errorMsg = "No queryFn provided and no default query function configured. " +
-                    "Either provide a queryFn in QueryOptions or set QueryClient.DefaultQueryFn.";
-                
+                var errorMsg = $"No queryFn provided and no default query function registered for type {typeof(T).Name}. " +
+                    "Either provide a queryFn in QueryOptions or call QueryClient.SetDefaultQueryFn<T>().";
+
                 _client.Logger.LogError(
                     new InvalidOperationException(errorMsg),
                     "Query configuration error for: {QueryKey}",
                     _queryOptions.QueryKey
                 );
-                
+
                 throw new InvalidOperationException(errorMsg);
             }
-            
+
             _client.Logger.LogDebug(
-                "Using default query function for: {QueryKey}",
-                _queryOptions.QueryKey
+                "Using type-safe default query function for: {QueryKey}, Type={Type}",
+                _queryOptions.QueryKey,
+                typeof(T).Name
             );
-            
-            // Wrap default query function with type casting and validation
+
+            // Use the type-safe default function directly - no runtime casting needed
             _queryOptions = new QueryOptions<T>(
                 queryKey: _queryOptions.QueryKey,
-                queryFn: async ctx => {
-                    try
-                    {
-                        // Log query execution with key for audit trail
-                        _client.Logger.LogDebug(
-                            "Executing default query function for: {QueryKey}",
-                            ctx.QueryKey
-                        );
-                        
-                        var result = await _client.DefaultQueryFn(ctx);
-                        
-                        // Validate result is not null for value types
-                        if (typeof(T).IsValueType && Nullable.GetUnderlyingType(typeof(T)) == null)
-                        {
-                            var ex = new InvalidOperationException(
-                                $"Default query function returned null for non-nullable value type {typeof(T).Name} for query: {ctx.QueryKey}"
-                            );
-                            _client.Logger.LogError(ex, "Validation error in default query function");
-                            throw ex;
-                        }
-                        
-                        // Type checking and casting
-                        if (result is T typedResult)
-                        {
-                            _client.Logger.LogDebug(
-                                "Default query function succeeded for: {QueryKey}, ResultType={ResultType}",
-                                ctx.QueryKey,
-                                result?.GetType().Name ?? "null"
-                            );
-                            return typedResult;
-                        }
-                        
-                        var castEx = new InvalidCastException(
-                            $"Default query function returned {result?.GetType().Name ?? "null"} " +
-                            $"but expected {typeof(T).Name} for query: {ctx.QueryKey}"
-                        );
-                        _client.Logger.LogError(
-                            castEx,
-                            "Type mismatch in default query function for: {QueryKey}",
-                            ctx.QueryKey
-                        );
-                        throw castEx;
-                    }
-                    catch (Exception ex) when (ex is not InvalidCastException && ex is not InvalidOperationException)
-                    {
-                        // Log unexpected errors from default query function
-                        _client.Logger.LogError(
-                            ex,
-                            "Unexpected error in default query function for: {QueryKey}",
-                            ctx.QueryKey
-                        );
-                        throw;
-                    }
-                },
+                queryFn: defaultFn,
                 staleTime: _queryOptions.StaleTime,
                 networkMode: _queryOptions.NetworkMode,
                 refetchOnReconnect: _queryOptions.RefetchOnReconnect,
