@@ -19,6 +19,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [2. Query Functions](./2.%20Query%20Functions.md) - Define your data fetching logic
 - [3. Network Mode](./3.%20Network%20Mode.md) - Handle online/offline scenarios
 - [4. Query Retries](./4.%20Query%20Retries.md) - Configure retry behavior
+- [5. Query Options](./5.%20Query%20Options.md) - Reusable query configurations
 
 ## 🚀 Quick Start
 
@@ -74,6 +75,19 @@ var todoQuery = new UseQuery<Todo>(
     ),
     queryClient
 );
+
+// Or with destructuring (JavaScript-like!)
+var todoQuery = new UseQuery<Todo>(
+    new QueryOptions<Todo>(
+        queryKey: new("todo", todoId),
+        queryFn: async ctx => {
+            var (queryKey, signal) = ctx; // Destructure context
+            var id = (int)queryKey[1]!;
+            return await FetchTodoByIdAsync(id, signal);
+        }
+    ),
+    queryClient
+);
 ```
 
 ### Network Modes
@@ -118,6 +132,33 @@ var query = new UseQuery<List<Todo>>(
     queryClient
 );
 ```
+
+### Reusable Query Options
+
+Create factory methods for better organization and reusability:
+
+```csharp
+// Define reusable query options
+static QueryOptions<Todo> TodoOptions(int id)
+{
+    return new QueryOptions<Todo>(
+        queryKey: new("todo", id),
+        queryFn: async ctx => {
+            var (queryKey, signal) = ctx;
+            var todoId = (int)queryKey[1]!;
+            return await FetchTodoAsync(todoId, signal);
+        },
+        staleTime: TimeSpan.FromMinutes(5)
+    );
+}
+
+// Use everywhere
+var query1 = new UseQuery<Todo>(TodoOptions(1), queryClient);
+var query2 = new UseQuery<Todo>(TodoOptions(2), queryClient);
+await queryClient.PrefetchQueryAsync(TodoOptions(3));
+```
+
+See [Query Options](./5.%20Query%20Options.md) for more details.
 
 ## 🎯 Key Concepts
 

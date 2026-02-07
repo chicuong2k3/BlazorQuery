@@ -127,6 +127,13 @@ finally
 {
     _fetchLock.Release();
 }
+
+// Good: Context destructuring (JavaScript-like)
+queryFn: async ctx => {
+    var (queryKey, signal) = ctx;
+    var id = (int)queryKey[1]!;
+    return await FetchDataAsync(id, signal);
+}
 ```
 
 ### 9. Common Pitfalls to Avoid
