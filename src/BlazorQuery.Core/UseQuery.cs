@@ -80,6 +80,12 @@ public class UseQuery<T> : IDisposable
     public bool IsFetching => FetchStatus == FetchStatus.Fetching;
     public bool IsPaused => FetchStatus == FetchStatus.Paused;
 
+    /// <summary>
+    /// Indicates if the current data is placeholder data (not persisted to cache).
+    /// True when displaying placeholderData while fetching actual data.
+    /// </summary>
+    public bool IsPlaceholderData { get; private set; }
+
     public int FailureCount { get; private set; }
     public bool IsRefetchError { get; private set; }
 
@@ -92,6 +98,7 @@ public class UseQuery<T> : IDisposable
 
     public event Action? OnChange;
     private readonly Action _onlineStatusHandler;
+    private readonly Action<bool> _focusChangedHandler;
     private CancellationTokenSource? _staleTimerCts;
     private CancellationTokenSource? _refetchIntervalCts;
     
@@ -99,6 +106,10 @@ public class UseQuery<T> : IDisposable
     /// Used to pause/resume retry when network goes offline/online during fetch
     /// </summary>
     private readonly SemaphoreSlim _pauseRetrySemaphore = new(0, 1);
+
+    // Track previous state for placeholder data function
+    private T? _previousData;
+    private QueryOptions<T>? _previousQueryOptions;
 
 
     public UseQuery(
@@ -110,6 +121,55 @@ public class UseQuery<T> : IDisposable
         _onlineManager = client.OnlineManager;
         FetchStatus = FetchStatus.Idle;
 
+        // Resolve QueryFn: use provided queryFn or fallback to type-safe default
+        if (_queryOptions.QueryFn == null)
+        {
+            var defaultFn = _client.GetDefaultQueryFn<T>();
+            if (defaultFn == null)
+            {
+                var errorMsg = $"No queryFn provided and no default query function registered for type {typeof(T).Name}. " +
+                    "Either provide a queryFn in QueryOptions or call QueryClient.SetDefaultQueryFn<T>().";
+
+                _client.Logger.LogError(
+                    new InvalidOperationException(errorMsg),
+                    "Query configuration error for: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
+
+                throw new InvalidOperationException(errorMsg);
+            }
+
+            _client.Logger.LogDebug(
+                "Using type-safe default query function for: {QueryKey}, Type={Type}",
+                _queryOptions.QueryKey,
+                typeof(T).Name
+            );
+
+            // Use the type-safe default function directly - no runtime casting needed
+            _queryOptions = new QueryOptions<T>(
+                queryKey: _queryOptions.QueryKey,
+                queryFn: defaultFn,
+                staleTime: _queryOptions.StaleTime,
+                networkMode: _queryOptions.NetworkMode,
+                refetchOnReconnect: _queryOptions.RefetchOnReconnect,
+                retry: _queryOptions.Retry,
+                retryInfinite: _queryOptions.RetryInfinite,
+                retryFunc: _queryOptions.RetryFunc,
+                retryDelay: _queryOptions.RetryDelay,
+                maxRetryDelay: _queryOptions.MaxRetryDelay,
+                retryDelayFunc: _queryOptions.RetryDelayFunc,
+                refetchInterval: _queryOptions.RefetchInterval,
+                meta: _queryOptions.Meta,
+                enabled: _queryOptions.Enabled,
+                refetchOnWindowFocus: _queryOptions.RefetchOnWindowFocus,
+                initialData: _queryOptions.InitialData,
+                initialDataFunc: _queryOptions.InitialDataFunc,
+                initialDataUpdatedAt: _queryOptions.InitialDataUpdatedAt,
+                placeholderData: _queryOptions.PlaceholderData,
+                placeholderDataFunc: _queryOptions.PlaceholderDataFunc
+            );
+        }
+
         if (_queryOptions.NetworkMode == default)
             _queryOptions.NetworkMode = _client.DefaultNetworkMode;
 
@@ -118,14 +178,194 @@ public class UseQuery<T> : IDisposable
 
         _onlineStatusHandler = () => _ = SafeHandleOnlineStatusChangedAsync();
 
-        if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
+        if (_queryOptions.RefetchOnReconnect)
         {
             _onlineManager.OnlineStatusChanged += _onlineStatusHandler;
         }
 
+        // Subscribe to focus changes for refetchOnWindowFocus
+        _focusChangedHandler = async void (isFocused) =>
+        {
+            try
+            {
+                await HandleFocusChangedAsync(isFocused);
+            }
+            catch (OperationCanceledException)
+            {
+                // Query was cancelled during focus refetch - this is expected
+                _client.Logger.LogDebug(
+                    "Focus refetch cancelled for query: {QueryKey}", 
+                    _queryOptions.QueryKey
+                );
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't propagate to prevent crashing the app
+                _client.Logger.LogError(
+                    ex,
+                    "Error during focus change handling for query: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
+            }
+        };
+        
+        if (_queryOptions.RefetchOnWindowFocus)
+        {
+            _client.FocusManager.FocusChanged += _focusChangedHandler;
+        }
+
+        // Subscribe to query invalidation events
+        _client.OnQueriesInvalidated += HandleQueriesInvalidated;
+        
+        // Subscribe to query cancellation events
+        _client.OnQueriesCancelled += HandleQueriesCancelled;
+
+        // Handle initial data and placeholder data
+        InitializeWithData();
+
         // Start interval polling if configured
         if (_queryOptions.RefetchInterval.HasValue)
             StartRefetchInterval();
+    }
+
+    private void HandleQueriesInvalidated(List<QueryKey> invalidatedKeys)
+    {
+        try
+        {
+            // Check if this query was invalidated
+            if (!invalidatedKeys.Contains(_queryOptions.QueryKey)) return;
+            
+            _client.Logger.LogInformation(
+                "Query invalidated and will refetch: {QueryKey}, Enabled={Enabled}",
+                _queryOptions.QueryKey,
+                _queryOptions.Enabled
+            );
+            
+            // Refetch if this query is enabled
+            if (_queryOptions.Enabled)
+            {
+                _ = ExecuteAsync();
+            }
+            else
+            {
+                _client.Logger.LogDebug(
+                    "Query invalidated but disabled, skipping refetch: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling query invalidation for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+            // Don't propagate - this is called from an event handler
+        }
+    }
+
+    private void HandleQueriesCancelled(List<QueryKey> cancelledKeys)
+    {
+        try
+        {
+            // Check if this query should be cancelled
+            if (cancelledKeys.Contains(_queryOptions.QueryKey))
+            {
+                _client.Logger.LogInformation(
+                    "Cancelling query: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
+                
+                // Cancel the current fetch
+                _currentCts?.Cancel();
+            }
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling query cancellation for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+            // Don't propagate - this is called from an event handler
+        }
+    }
+
+    private void InitializeWithData()
+    {
+        // Priority 1: Initial data (persisted to cache)
+        T? initialData = default;
+        bool hasInitialData = false;
+
+        if (_queryOptions.InitialDataFunc != null)
+        {
+            // Lazy evaluation - only called once
+            initialData = _queryOptions.InitialDataFunc();
+            hasInitialData = initialData != null;
+        }
+        else if (_queryOptions.InitialData != null)
+        {
+            initialData = _queryOptions.InitialData;
+            hasInitialData = true;
+        }
+
+        if (hasInitialData && initialData != null)
+        {
+            // Set initial data in cache (PERSISTED)
+            _client.Set(_queryOptions.QueryKey, initialData);
+            
+            // Update cache entry timestamp if initialDataUpdatedAt was provided
+            var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
+            if (entry != null && _queryOptions.InitialDataUpdatedAt.HasValue)
+            {
+                entry.FetchTime = _queryOptions.InitialDataUpdatedAt.Value;
+            }
+
+            // Set local state
+            Data = initialData;
+            IsPlaceholderData = false;
+            
+            // Note: Status is automatically computed based on Data and Error
+            // Since Data is set and Error is null:
+            //   Status = Success (computed property)
+            //   FetchStatus = Idle (already set in constructor)
+            
+            // Note: Staleness checking happens in ExecuteAsync
+            // If (UtcNow - entry.FetchTime) > staleTime: will refetch
+            // If (UtcNow - entry.FetchTime) <= staleTime: won't refetch (still fresh)
+            return;
+        }
+
+        // Priority 2: Placeholder data (NOT persisted to cache)
+        T? placeholderData = default;
+        bool hasPlaceholderData = false;
+
+        if (_queryOptions.PlaceholderDataFunc != null)
+        {
+            // Function receives previousData and previousQuery for transitions
+            placeholderData = _queryOptions.PlaceholderDataFunc(_previousData, _previousQueryOptions);
+            hasPlaceholderData = placeholderData != null;
+        }
+        else if (_queryOptions.PlaceholderData != null)
+        {
+            placeholderData = _queryOptions.PlaceholderData;
+            hasPlaceholderData = true;
+        }
+
+        if (hasPlaceholderData && placeholderData != null)
+        {
+            // Set placeholder data (NOT persisted to cache)
+            Data = placeholderData;
+            IsPlaceholderData = true;
+            
+            // Note: Status is automatically computed based on Data and Error
+            // Since Data is set and Error is null:
+            //   Status = Success (computed property)
+            //   FetchStatus = Idle (already set in constructor)
+            // Query will still fetch actual data in background
+            // When real data arrives, IsPlaceholderData will become false
+        }
     }
 
     private async Task SafeHandleOnlineStatusChangedAsync()
@@ -135,9 +375,21 @@ public class UseQuery<T> : IDisposable
             await Task.Yield();
             await OnOnlineStatusChangedAsync().ConfigureAwait(false);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // ignore
+            // Expected when query is being disposed
+            _client.Logger.LogDebug(
+                "Online status change handler cancelled for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling online status change for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
         }
     }
     private Task OnOnlineStatusChangedAsync()
@@ -203,11 +455,44 @@ public class UseQuery<T> : IDisposable
         return Task.CompletedTask;
     }
 
+    private async Task HandleFocusChangedAsync(bool isFocused)
+    {
+        // Only refetch when window gains focus (not when losing focus)
+        if (!isFocused)
+            return;
+
+        // Don't refetch if query is disabled
+        if (!_queryOptions.Enabled)
+            return;
+
+        // Don't refetch if already fetching
+        if (FetchStatus == FetchStatus.Fetching)
+            return;
+
+        // Check if data is stale
+        var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
+        var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
+                                        (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
+
+        // Only refetch if data is stale
+        if (isDataStale)
+        {
+            await ExecuteAsync();
+        }
+    }
+
     /// <summary>
     /// Executes the query manually.
     /// </summary>
     public async Task ExecuteAsync(CancellationToken? signal = null, bool isRefetch = false)
     {
+        // If query is disabled, don't execute
+        if (!_queryOptions.Enabled)
+        {
+            FetchStatus = FetchStatus.Idle;
+            return;
+        }
+
         await _fetchLock.WaitAsync();
         CancellationTokenSource? linkedCts = null;
 
@@ -218,7 +503,7 @@ public class UseQuery<T> : IDisposable
             // Cancel _currentCts only if a fetch is already running
             if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
             {
-                _currentCts.Cancel();
+                await _currentCts.CancelAsync();
             }
             _currentCts = new CancellationTokenSource();
 
@@ -233,7 +518,7 @@ public class UseQuery<T> : IDisposable
             var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
 
             // Optimistically set data from cache if it exists
-            if (entry != null && entry.Data is T cached)
+            if (entry is { Data: T cached })
             {
                 Data = cached;
             }
@@ -266,6 +551,7 @@ public class UseQuery<T> : IDisposable
             }
 
             FetchStatus = FetchStatus.Fetching;
+            _client.IncrementFetchingQueries(); // Track global fetching state
 
             if (!isRefetch)
             {
@@ -284,10 +570,18 @@ public class UseQuery<T> : IDisposable
                 try
                 {
                     var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token, _queryOptions.Meta);
-                    Data = await _client.FetchAsync(_queryOptions.QueryKey,
-                                                    _ => _queryOptions.QueryFn(ctx),
+                    var fetchedData = await _client.FetchAsync(_queryOptions.QueryKey,
+                                                    _ => _queryOptions.QueryFn!(ctx),
                                                     _queryOptions.StaleTime,
                                                     token);
+
+                    // Save previous state before updating
+                    _previousData = Data;
+                    _previousQueryOptions = _queryOptions;
+                    
+                    // Set real data and clear placeholder flag
+                    Data = fetchedData;
+                    IsPlaceholderData = false;
 
                     _lastError = null;
                     Error = null;
@@ -400,7 +694,7 @@ public class UseQuery<T> : IDisposable
                         }
 
                         // Check if user cancelled while we were paused
-                        if (signal.HasValue && signal.Value.IsCancellationRequested)
+                        if (signal is { IsCancellationRequested: true })
                         {
                             FetchStatus = FetchStatus.Paused;
                             return;
@@ -446,6 +740,7 @@ public class UseQuery<T> : IDisposable
             if (FetchStatus != FetchStatus.Paused)
             {
                 FetchStatus = FetchStatus.Idle;
+                _client.DecrementFetchingQueries(); // Track global fetching state
             }
 
             linkedCts?.Dispose();
@@ -487,7 +782,7 @@ public class UseQuery<T> : IDisposable
     /// </summary>
     private void StartStaleTimer()
     {
-        if (_staleTimerCts != null && !_staleTimerCts.IsCancellationRequested)
+        if (_staleTimerCts is { IsCancellationRequested: false })
             return;
 
         // Cancel any previous timer to prevent overlapping refetches
@@ -544,6 +839,15 @@ public class UseQuery<T> : IDisposable
         {
             if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
                 _onlineManager.OnlineStatusChanged -= _onlineStatusHandler;
+            
+            if (_queryOptions.RefetchOnWindowFocus)
+                _client.FocusManager.FocusChanged -= _focusChangedHandler;
+            
+            // Unsubscribe from invalidation events
+            _client.OnQueriesInvalidated -= HandleQueriesInvalidated;
+            
+            // Unsubscribe from cancellation events
+            _client.OnQueriesCancelled -= HandleQueriesCancelled;
         }
         catch
         {

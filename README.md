@@ -15,12 +15,29 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 
 ## 📚 Documentation
 
+- [⚠️ Important Defaults](./21.%20Important%20Defaults.md) - **Start here!** Understand default behaviors
+- [🛡️ Security Best Practices](./23.%20Security%20Best%20Practices.md) - **Essential!** Secure your application
 - [1. Query Keys](./1.%20Query%20Keys.md) - Learn about query identification and caching
 - [2. Query Functions](./2.%20Query%20Functions.md) - Define your data fetching logic
 - [3. Network Mode](./3.%20Network%20Mode.md) - Handle online/offline scenarios
 - [4. Query Retries](./4.%20Query%20Retries.md) - Configure retry behavior
 - [5. Query Options](./5.%20Query%20Options.md) - Reusable query configurations
 - [6. Parallel Queries](./6.%20Parallel%20Queries.md) - Execute multiple queries in parallel
+- [7. Dependent Queries](./7.%20Dependent%20Queries.md) - Serial queries that depend on previous results
+- [8. Background Fetching Indicators](./8.%20Background%20Fetching%20Indicators.md) - Show loading states for background refetches
+- [9. Disabling Queries](./9.%20Disabling%20Queries.md) - Control when queries execute with enabled option
+- [10. Window Focus Refetching](./10.%20Window%20Focus%20Refetching.md) - Automatic refetch when window gains focus
+- [11. Initial Query Data](./11.%20Initial%20Query%20Data.md) - Prepopulate queries with initial data
+- [12. Placeholder Query Data](./12.%20Placeholder%20Query%20Data.md) - Show preview data while fetching actual data
+- [13. Paginated Queries](./13.%20Paginated%20Queries.md) - Smooth pagination without loading flicker
+- [14. Infinite Queries](./14.%20Infinite%20Queries.md) - Load more and infinite scroll patterns
+- [15. Query Invalidation](./15.%20Query%20Invalidation.md) - Invalidate and refetch queries on demand
+- [16. Filters](./16.%20Filters.md) - Advanced query filtering and matching
+- [17. Query Cancellation](./17.%20Query%20Cancellation.md) - Cancel ongoing queries with CancellationToken
+- [18. Scroll Restoration](./18.%20Scroll%20Restoration.md) - Automatic scroll position preservation
+- [19. Default Query Function](./19.%20Default%20Query%20Function.md) - Shared query function for entire app
+- [20. Render Optimizations](./20.%20Render%20Optimizations.md) - Optimize component re-rendering performance
+- [22. Logging and Error Handling](./22.%20Logging%20and%20Error%20Handling.md) - Production-ready logging and diagnostics
 
 ## 🚀 Quick Start
 
