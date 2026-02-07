@@ -126,23 +126,79 @@ public class UseQuery<T> : IDisposable
         {
             if (_client.DefaultQueryFn == null)
             {
-                throw new InvalidOperationException(
-                    "No queryFn provided and no default query function configured. " +
-                    "Either provide a queryFn in QueryOptions or set QueryClient.DefaultQueryFn."
+                var errorMsg = "No queryFn provided and no default query function configured. " +
+                    "Either provide a queryFn in QueryOptions or set QueryClient.DefaultQueryFn.";
+                
+                _client.Logger.LogError(
+                    new InvalidOperationException(errorMsg),
+                    "Query configuration error for: {QueryKey}",
+                    _queryOptions.QueryKey
                 );
+                
+                throw new InvalidOperationException(errorMsg);
             }
             
-            // Wrap default query function with type casting
+            _client.Logger.LogDebug(
+                "Using default query function for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+            
+            // Wrap default query function with type casting and validation
             _queryOptions = new QueryOptions<T>(
                 queryKey: _queryOptions.QueryKey,
                 queryFn: async ctx => {
-                    var result = await _client.DefaultQueryFn(ctx);
-                    if (result is T typedResult)
-                        return typedResult;
-                    throw new InvalidCastException(
-                        $"Default query function returned {result?.GetType().Name ?? "null"} " +
-                        $"but expected {typeof(T).Name}"
-                    );
+                    try
+                    {
+                        // Log query execution with key for audit trail
+                        _client.Logger.LogDebug(
+                            "Executing default query function for: {QueryKey}",
+                            ctx.QueryKey
+                        );
+                        
+                        var result = await _client.DefaultQueryFn(ctx);
+                        
+                        // Validate result is not null for value types
+                        if (typeof(T).IsValueType && Nullable.GetUnderlyingType(typeof(T)) == null)
+                        {
+                            var ex = new InvalidOperationException(
+                                $"Default query function returned null for non-nullable value type {typeof(T).Name} for query: {ctx.QueryKey}"
+                            );
+                            _client.Logger.LogError(ex, "Validation error in default query function");
+                            throw ex;
+                        }
+                        
+                        // Type checking and casting
+                        if (result is T typedResult)
+                        {
+                            _client.Logger.LogDebug(
+                                "Default query function succeeded for: {QueryKey}, ResultType={ResultType}",
+                                ctx.QueryKey,
+                                result?.GetType().Name ?? "null"
+                            );
+                            return typedResult;
+                        }
+                        
+                        var castEx = new InvalidCastException(
+                            $"Default query function returned {result?.GetType().Name ?? "null"} " +
+                            $"but expected {typeof(T).Name} for query: {ctx.QueryKey}"
+                        );
+                        _client.Logger.LogError(
+                            castEx,
+                            "Type mismatch in default query function for: {QueryKey}",
+                            ctx.QueryKey
+                        );
+                        throw castEx;
+                    }
+                    catch (Exception ex) when (ex is not InvalidCastException && ex is not InvalidOperationException)
+                    {
+                        // Log unexpected errors from default query function
+                        _client.Logger.LogError(
+                            ex,
+                            "Unexpected error in default query function for: {QueryKey}",
+                            ctx.QueryKey
+                        );
+                        throw;
+                    }
                 },
                 staleTime: _queryOptions.StaleTime,
                 networkMode: _queryOptions.NetworkMode,
@@ -185,9 +241,22 @@ public class UseQuery<T> : IDisposable
             {
                 await HandleFocusChangedAsync(isFocused);
             }
-            catch (Exception)
+            catch (OperationCanceledException)
             {
-                // ignore
+                // Query was cancelled during focus refetch - this is expected
+                _client.Logger.LogDebug(
+                    "Focus refetch cancelled for query: {QueryKey}", 
+                    _queryOptions.QueryKey
+                );
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't propagate to prevent crashing the app
+                _client.Logger.LogError(
+                    ex,
+                    "Error during focus change handling for query: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
             }
         };
         
@@ -212,22 +281,65 @@ public class UseQuery<T> : IDisposable
 
     private void HandleQueriesInvalidated(List<QueryKey> invalidatedKeys)
     {
-        // Check if this query was invalidated
-        if (!invalidatedKeys.Contains(_queryOptions.QueryKey)) return;
-        // Refetch if this query is enabled
-        if (_queryOptions.Enabled)
+        try
         {
-            _ = ExecuteAsync();
+            // Check if this query was invalidated
+            if (!invalidatedKeys.Contains(_queryOptions.QueryKey)) return;
+            
+            _client.Logger.LogInformation(
+                "Query invalidated and will refetch: {QueryKey}, Enabled={Enabled}",
+                _queryOptions.QueryKey,
+                _queryOptions.Enabled
+            );
+            
+            // Refetch if this query is enabled
+            if (_queryOptions.Enabled)
+            {
+                _ = ExecuteAsync();
+            }
+            else
+            {
+                _client.Logger.LogDebug(
+                    "Query invalidated but disabled, skipping refetch: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling query invalidation for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+            // Don't propagate - this is called from an event handler
         }
     }
 
     private void HandleQueriesCancelled(List<QueryKey> cancelledKeys)
     {
-        // Check if this query should be cancelled
-        if (cancelledKeys.Contains(_queryOptions.QueryKey))
+        try
         {
-            // Cancel the current fetch
-            _currentCts?.Cancel();
+            // Check if this query should be cancelled
+            if (cancelledKeys.Contains(_queryOptions.QueryKey))
+            {
+                _client.Logger.LogInformation(
+                    "Cancelling query: {QueryKey}",
+                    _queryOptions.QueryKey
+                );
+                
+                // Cancel the current fetch
+                _currentCts?.Cancel();
+            }
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling query cancellation for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+            // Don't propagate - this is called from an event handler
         }
     }
 
@@ -305,9 +417,21 @@ public class UseQuery<T> : IDisposable
             await Task.Yield();
             await OnOnlineStatusChangedAsync().ConfigureAwait(false);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // ignore
+            // Expected when query is being disposed
+            _client.Logger.LogDebug(
+                "Online status change handler cancelled for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling online status change for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
         }
     }
     private Task OnOnlineStatusChangedAsync()

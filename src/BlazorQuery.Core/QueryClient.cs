@@ -12,6 +12,11 @@ public class QueryClient : IDisposable
     public IFocusManager FocusManager { get; private set; }
     
     /// <summary>
+    /// Logger for audit logging and diagnostics.
+    /// </summary>
+    public IQueryLogger Logger { get; set; }
+    
+    /// <summary>
     /// Default value for refetchOnWindowFocus option.
     /// Can be overridden per-query.
     /// </summary>
@@ -59,10 +64,17 @@ public class QueryClient : IDisposable
     /// <param name="focusManager">
     /// Optional. Defaults to DefaultFocusManager if not provided.
     /// </param>
-    public QueryClient(IOnlineManager? onlineManager = null, IFocusManager? focusManager = null)
+    /// <param name="logger">
+    /// Optional. Logger for audit logging and diagnostics. Defaults to NullQueryLogger.
+    /// </param>
+    public QueryClient(
+        IOnlineManager? onlineManager = null, 
+        IFocusManager? focusManager = null,
+        IQueryLogger? logger = null)
     {
         OnlineManager = onlineManager ?? new DefaultOnlineManager();
         FocusManager = focusManager ?? new DefaultFocusManager();
+        Logger = logger ?? NullQueryLogger.Instance;
         DefaultNetworkMode = NetworkMode.Online;
     }
 
@@ -180,23 +192,46 @@ public class QueryClient : IDisposable
     {
         filters ??= new QueryFilters(); // Match all if no filters
 
-        // Find all matching cache entries
-        var keysToInvalidate = _cache.Keys
-            .Where(key => filters.Matches(key))
-            .ToList();
-
-        foreach (var key in keysToInvalidate)
+        try
         {
-            if (_cache.TryGetValue(key, out var entry))
-            {
-                // Mark as stale by setting FetchTime to distant past
-                // This overrides any staleTime configuration
-                entry.FetchTime = DateTime.MinValue;
-            }
-        }
+            // Find all matching cache entries
+            var keysToInvalidate = _cache.Keys
+                .Where(key => filters.Matches(key))
+                .ToList();
 
-        // Fire event for invalidated queries (for active queries to refetch)
-        OnQueriesInvalidated?.Invoke(keysToInvalidate);
+            Logger.LogInformation(
+                "Invalidating {Count} queries. Filter: QueryKey={QueryKey}, Exact={Exact}, Type={Type}",
+                keysToInvalidate.Count,
+                filters.QueryKey?.ToString() ?? "null",
+                filters.Exact,
+                filters.Type
+            );
+
+            foreach (var key in keysToInvalidate)
+            {
+                if (_cache.TryGetValue(key, out var entry))
+                {
+                    // Mark as stale by setting FetchTime to distant past
+                    // This overrides any staleTime configuration
+                    entry.FetchTime = DateTime.MinValue;
+                    
+                    Logger.LogDebug("Invalidated query: {QueryKey}", key);
+                }
+            }
+
+            // Fire event for invalidated queries (for active queries to refetch)
+            OnQueriesInvalidated?.Invoke(keysToInvalidate);
+            
+            Logger.LogInformation(
+                "Query invalidation completed. {Count} queries invalidated.",
+                keysToInvalidate.Count
+            );
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during query invalidation");
+            throw;
+        }
     }
 
     /// <summary>
@@ -222,13 +257,34 @@ public class QueryClient : IDisposable
         filters ??= new QueryFilters(); // Match all if no filters
         options ??= new CancelOptions();
 
-        // Find all matching cache entries
-        var keysToCancel = _cache.Keys
-            .Where(key => filters.Matches(key))
-            .ToList();
+        try
+        {
+            // Find all matching cache entries
+            var keysToCancel = _cache.Keys
+                .Where(key => filters.Matches(key))
+                .ToList();
 
-        // Fire event for cancelled queries (for active queries to cancel themselves)
-        OnQueriesCancelled?.Invoke(keysToCancel);
+            Logger.LogInformation(
+                "Cancelling {Count} queries. Filter: QueryKey={QueryKey}, Silent={Silent}, Revert={Revert}",
+                keysToCancel.Count,
+                filters.QueryKey?.ToString() ?? "null",
+                options.Silent,
+                options.Revert
+            );
+
+            // Fire event for cancelled queries (for active queries to cancel themselves)
+            OnQueriesCancelled?.Invoke(keysToCancel);
+            
+            Logger.LogInformation(
+                "Query cancellation completed. {Count} queries notified.",
+                keysToCancel.Count
+            );
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during query cancellation");
+            throw;
+        }
     }
 
     /// <summary>
