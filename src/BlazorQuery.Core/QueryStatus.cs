@@ -1,4 +1,4 @@
-﻿namespace BlazorQuery.Core.BuildingBlocks;
+﻿namespace BlazorQuery.Core;
 
 public enum QueryStatus
 {

@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Reflection;
 
-namespace BlazorQuery.Core.BuildingBlocks;
+namespace BlazorQuery.Core;
 
 /// <summary>
 /// Represents a composite key that uniquely identifies a query or cache entry.
