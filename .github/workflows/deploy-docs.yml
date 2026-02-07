@@ -2,6 +2,9 @@ name: Deploy SwrSharp Docs to GitHub Pages
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - 'docs/SwrSharp.Doc/**'
+      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,13 +29,13 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
         working-directory: ./docs/SwrSharp.Doc
-      - name: Publish
+      - name: Publish static site
         run: dotnet run --configuration Release --no-build
         working-directory: ./docs/SwrSharp.Doc
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs/SwrSharp.Doc/bin/Release/net10.0/publish/wwwroot
+          path: ./docs/SwrSharp.Doc/output
   deploy:
     environment:
       name: github-pages

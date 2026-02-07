@@ -37,7 +37,9 @@ Copy contents of `wwwroot/` to:
 - **Azure Static Web Apps**: Use Azure CLI
 - **AWS S3**: Upload to S3 bucket
 ## GitHub Actions Workflow Details
-The workflow (`.github/workflows/publish.yml`) performs these steps:
+The workflow is located at: `.github/workflows/deploy-docs.yml` (in repository root)
+
+It performs these steps:
 1. **Checkout code** from repository
 2. **Setup .NET 8.0** environment
 3. **Restore dependencies** with `dotnet restore`
