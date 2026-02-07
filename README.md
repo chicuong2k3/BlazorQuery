@@ -25,6 +25,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [8. Background Fetching Indicators](./8.%20Background%20Fetching%20Indicators.md) - Show loading states for background refetches
 - [9. Disabling Queries](./9.%20Disabling%20Queries.md) - Control when queries execute with enabled option
 - [10. Window Focus Refetching](./10.%20Window%20Focus%20Refetching.md) - Automatic refetch when window gains focus
+- [11. Initial Query Data](./11.%20Initial%20Query%20Data.md) - Prepopulate queries with initial data
 
 ## 🚀 Quick Start
 

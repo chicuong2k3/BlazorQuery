@@ -35,6 +35,11 @@ public class QueryClient : IDisposable
         public Exception? Error { get; set; }
         public DateTime FetchTime { get; set; }
         public Task? OngoingFetch { get; set; }
+        
+        /// <summary>
+        /// Alias for FetchTime to match React Query's dataUpdatedAt property.
+        /// </summary>
+        public DateTime DataUpdatedAt => FetchTime;
     }
 
     private readonly ConcurrentDictionary<QueryKey, CacheEntry> _cache = new();
@@ -142,6 +147,23 @@ public class QueryClient : IDisposable
         _cache.TryGetValue(key, out var entry);
         return entry;
     }
+
+    /// <summary>
+    /// Gets query state including data and metadata.
+    /// Alias for GetCacheEntry.
+    /// </summary>
+    public CacheEntry? GetQueryState(QueryKey key) => GetCacheEntry(key);
+
+    /// <summary>
+    /// Gets cached query data with type safety.
+    /// </summary>
+    public T? GetQueryData<T>(QueryKey key) => Get<T>(key);
+
+    /// <summary>
+    /// Sets query data in cache.
+    /// Alias for Set.
+    /// </summary>
+    public void SetQueryData<T>(QueryKey key, T value) => Set(key, value);
 
     /// <summary>
     /// Internal: Increment global fetching counter.

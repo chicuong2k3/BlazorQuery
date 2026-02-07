@@ -142,9 +142,53 @@ public class UseQuery<T> : IDisposable
             _client.FocusManager.FocusChanged += _focusChangedHandler;
         }
 
+        // Handle initial data
+        InitializeWithInitialData();
+
         // Start interval polling if configured
         if (_queryOptions.RefetchInterval.HasValue)
             StartRefetchInterval();
+    }
+
+    private void InitializeWithInitialData()
+    {
+        // Get initial data from direct value or function
+        T? initialData = default;
+        bool hasInitialData = false;
+
+        if (_queryOptions.InitialDataFunc != null)
+        {
+            // Lazy evaluation - only called once
+            initialData = _queryOptions.InitialDataFunc();
+            hasInitialData = initialData != null;
+        }
+        else if (_queryOptions.InitialData != null)
+        {
+            initialData = _queryOptions.InitialData;
+            hasInitialData = true;
+        }
+
+        if (hasInitialData && initialData != null)
+        {
+            // Set initial data in cache
+            var initialDataUpdatedAt = _queryOptions.InitialDataUpdatedAt ?? DateTime.UtcNow;
+            
+            _client.Set(_queryOptions.QueryKey, initialData);
+            
+            // Update cache entry timestamp if initialDataUpdatedAt was provided
+            var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
+            if (entry != null && _queryOptions.InitialDataUpdatedAt.HasValue)
+            {
+                entry.FetchTime = _queryOptions.InitialDataUpdatedAt.Value;
+            }
+
+            // Set local state
+            Data = initialData;
+            
+            // Note: Staleness checking happens in ExecuteAsync
+            // If (UtcNow - initialDataUpdatedAt) > staleTime: will refetch
+            // If (UtcNow - initialDataUpdatedAt) <= staleTime: won't refetch (still fresh)
+        }
     }
 
     private async Task SafeHandleOnlineStatusChangedAsync()
