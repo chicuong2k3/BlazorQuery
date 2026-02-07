@@ -23,7 +23,9 @@ public class QueryOptions<T>
         bool refetchOnWindowFocus = true,
         T? initialData = default,
         Func<T?>? initialDataFunc = null,
-        DateTime? initialDataUpdatedAt = null)
+        DateTime? initialDataUpdatedAt = null,
+        T? placeholderData = default,
+        Func<T?, QueryOptions<T>?, T?>? placeholderDataFunc = null)
     {
         QueryKey = queryKey;
         QueryFn = queryFn;
@@ -43,6 +45,8 @@ public class QueryOptions<T>
         InitialData = initialData;
         InitialDataFunc = initialDataFunc;
         InitialDataUpdatedAt = initialDataUpdatedAt;
+        PlaceholderData = placeholderData;
+        PlaceholderDataFunc = placeholderDataFunc;
     }
 
     public QueryKey QueryKey { get; init; } = null!;
@@ -78,6 +82,19 @@ public class QueryOptions<T>
     /// Used with staleTime to determine if data needs refetching.
     /// </summary>
     public DateTime? InitialDataUpdatedAt { get; init; }
+    
+    /// <summary>
+    /// Placeholder data to display while fetching actual data.
+    /// NOT persisted to cache. Useful for partial/preview data.
+    /// </summary>
+    public T? PlaceholderData { get; init; }
+    
+    /// <summary>
+    /// Function to compute placeholder data.
+    /// Receives previousData and previousQuery for transitions.
+    /// NOT persisted to cache.
+    /// </summary>
+    public Func<T?, QueryOptions<T>?, T?>? PlaceholderDataFunc { get; init; }
 }
 
 public class QueryOptions : QueryOptions<object?>
@@ -99,7 +116,9 @@ public class QueryOptions : QueryOptions<object?>
                         bool refetchOnWindowFocus = true,
                         object? initialData = default,
                         Func<object?>? initialDataFunc = null,
-                        DateTime? initialDataUpdatedAt = null) : base(
+                        DateTime? initialDataUpdatedAt = null,
+                        object? placeholderData = default,
+                        Func<object?, QueryOptions<object?>?, object?>? placeholderDataFunc = null) : base(
                             queryKey,
                             queryFn,
                             staleTime,
@@ -117,7 +136,9 @@ public class QueryOptions : QueryOptions<object?>
                             refetchOnWindowFocus,
                             initialData,
                             initialDataFunc,
-                            initialDataUpdatedAt)
+                            initialDataUpdatedAt,
+                            placeholderData,
+                            placeholderDataFunc)
     {
     }
 }

@@ -80,6 +80,12 @@ public class UseQuery<T> : IDisposable
     public bool IsFetching => FetchStatus == FetchStatus.Fetching;
     public bool IsPaused => FetchStatus == FetchStatus.Paused;
 
+    /// <summary>
+    /// Indicates if the current data is placeholder data (not persisted to cache).
+    /// True when displaying placeholderData while fetching actual data.
+    /// </summary>
+    public bool IsPlaceholderData { get; private set; }
+
     public int FailureCount { get; private set; }
     public bool IsRefetchError { get; private set; }
 
@@ -100,6 +106,10 @@ public class UseQuery<T> : IDisposable
     /// Used to pause/resume retry when network goes offline/online during fetch
     /// </summary>
     private readonly SemaphoreSlim _pauseRetrySemaphore = new(0, 1);
+
+    // Track previous state for placeholder data function
+    private T? _previousData;
+    private QueryOptions<T>? _previousQueryOptions;
 
 
     public UseQuery(
@@ -142,17 +152,17 @@ public class UseQuery<T> : IDisposable
             _client.FocusManager.FocusChanged += _focusChangedHandler;
         }
 
-        // Handle initial data
-        InitializeWithInitialData();
+        // Handle initial data and placeholder data
+        InitializeWithData();
 
         // Start interval polling if configured
         if (_queryOptions.RefetchInterval.HasValue)
             StartRefetchInterval();
     }
 
-    private void InitializeWithInitialData()
+    private void InitializeWithData()
     {
-        // Get initial data from direct value or function
+        // Priority 1: Initial data (persisted to cache)
         T? initialData = default;
         bool hasInitialData = false;
 
@@ -170,9 +180,7 @@ public class UseQuery<T> : IDisposable
 
         if (hasInitialData && initialData != null)
         {
-            // Set initial data in cache
-            var initialDataUpdatedAt = _queryOptions.InitialDataUpdatedAt ?? DateTime.UtcNow;
-            
+            // Set initial data in cache (PERSISTED)
             _client.Set(_queryOptions.QueryKey, initialData);
             
             // Update cache entry timestamp if initialDataUpdatedAt was provided
@@ -184,10 +192,38 @@ public class UseQuery<T> : IDisposable
 
             // Set local state
             Data = initialData;
+            IsPlaceholderData = false;
             
             // Note: Staleness checking happens in ExecuteAsync
-            // If (UtcNow - initialDataUpdatedAt) > staleTime: will refetch
-            // If (UtcNow - initialDataUpdatedAt) <= staleTime: won't refetch (still fresh)
+            // If (UtcNow - entry.FetchTime) > staleTime: will refetch
+            // If (UtcNow - entry.FetchTime) <= staleTime: won't refetch (still fresh)
+            return;
+        }
+
+        // Priority 2: Placeholder data (NOT persisted to cache)
+        T? placeholderData = default;
+        bool hasPlaceholderData = false;
+
+        if (_queryOptions.PlaceholderDataFunc != null)
+        {
+            // Function receives previousData and previousQuery for transitions
+            placeholderData = _queryOptions.PlaceholderDataFunc(_previousData, _previousQueryOptions);
+            hasPlaceholderData = placeholderData != null;
+        }
+        else if (_queryOptions.PlaceholderData != null)
+        {
+            placeholderData = _queryOptions.PlaceholderData;
+            hasPlaceholderData = true;
+        }
+
+        if (hasPlaceholderData && placeholderData != null)
+        {
+            // Set placeholder data (NOT persisted to cache)
+            Data = placeholderData;
+            IsPlaceholderData = true;
+            
+            // Note: Query will still fetch actual data in background
+            // When real data arrives, IsPlaceholderData will become false
         }
     }
 
@@ -381,10 +417,18 @@ public class UseQuery<T> : IDisposable
                 try
                 {
                     var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token, _queryOptions.Meta);
-                    Data = await _client.FetchAsync(_queryOptions.QueryKey,
+                    var fetchedData = await _client.FetchAsync(_queryOptions.QueryKey,
                                                     _ => _queryOptions.QueryFn(ctx),
                                                     _queryOptions.StaleTime,
                                                     token);
+
+                    // Save previous state before updating
+                    _previousData = Data;
+                    _previousQueryOptions = _queryOptions;
+                    
+                    // Set real data and clear placeholder flag
+                    Data = fetchedData;
+                    IsPlaceholderData = false;
 
                     _lastError = null;
                     Error = null;
