@@ -27,6 +27,8 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [10. Window Focus Refetching](./10.%20Window%20Focus%20Refetching.md) - Automatic refetch when window gains focus
 - [11. Initial Query Data](./11.%20Initial%20Query%20Data.md) - Prepopulate queries with initial data
 - [12. Placeholder Query Data](./12.%20Placeholder%20Query%20Data.md) - Show preview data while fetching actual data
+- [13. Paginated Queries](./13.%20Paginated%20Queries.md) - Smooth pagination without loading flicker
+- [14. Infinite Queries](./14.%20Infinite%20Queries.md) - Load more and infinite scroll patterns
 
 ## 🚀 Quick Start
 

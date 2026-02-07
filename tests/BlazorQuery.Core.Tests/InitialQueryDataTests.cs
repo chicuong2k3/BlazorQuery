@@ -277,7 +277,6 @@ public class InitialQueryDataTests : IDisposable
         
         _client.SetQueryData(new QueryKey("todos"), todosList);
 
-        // Now create a query for individual todo using cache as initial data
         var todoId = 2;
         var query = new UseQuery<Todo>(
             new QueryOptions<Todo>(
