@@ -32,6 +32,8 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [15. Query Invalidation](./15.%20Query%20Invalidation.md) - Invalidate and refetch queries on demand
 - [16. Filters](./16.%20Filters.md) - Advanced query filtering and matching
 - [17. Query Cancellation](./17.%20Query%20Cancellation.md) - Cancel ongoing queries with CancellationToken
+- [18. Scroll Restoration](./18.%20Scroll%20Restoration.md) - Automatic scroll position preservation
+- [19. Default Query Function](./19.%20Default%20Query%20Function.md) - Shared query function for entire app
 
 ## 🚀 Quick Start
 

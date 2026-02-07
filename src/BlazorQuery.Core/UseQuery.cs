@@ -121,6 +121,50 @@ public class UseQuery<T> : IDisposable
         _onlineManager = client.OnlineManager;
         FetchStatus = FetchStatus.Idle;
 
+        // Resolve QueryFn: use provided queryFn or fallback to default
+        if (_queryOptions.QueryFn == null)
+        {
+            if (_client.DefaultQueryFn == null)
+            {
+                throw new InvalidOperationException(
+                    "No queryFn provided and no default query function configured. " +
+                    "Either provide a queryFn in QueryOptions or set QueryClient.DefaultQueryFn."
+                );
+            }
+            
+            // Wrap default query function with type casting
+            _queryOptions = new QueryOptions<T>(
+                queryKey: _queryOptions.QueryKey,
+                queryFn: async ctx => {
+                    var result = await _client.DefaultQueryFn(ctx);
+                    if (result is T typedResult)
+                        return typedResult;
+                    throw new InvalidCastException(
+                        $"Default query function returned {result?.GetType().Name ?? "null"} " +
+                        $"but expected {typeof(T).Name}"
+                    );
+                },
+                staleTime: _queryOptions.StaleTime,
+                networkMode: _queryOptions.NetworkMode,
+                refetchOnReconnect: _queryOptions.RefetchOnReconnect,
+                retry: _queryOptions.Retry,
+                retryInfinite: _queryOptions.RetryInfinite,
+                retryFunc: _queryOptions.RetryFunc,
+                retryDelay: _queryOptions.RetryDelay,
+                maxRetryDelay: _queryOptions.MaxRetryDelay,
+                retryDelayFunc: _queryOptions.RetryDelayFunc,
+                refetchInterval: _queryOptions.RefetchInterval,
+                meta: _queryOptions.Meta,
+                enabled: _queryOptions.Enabled,
+                refetchOnWindowFocus: _queryOptions.RefetchOnWindowFocus,
+                initialData: _queryOptions.InitialData,
+                initialDataFunc: _queryOptions.InitialDataFunc,
+                initialDataUpdatedAt: _queryOptions.InitialDataUpdatedAt,
+                placeholderData: _queryOptions.PlaceholderData,
+                placeholderDataFunc: _queryOptions.PlaceholderDataFunc
+            );
+        }
+
         if (_queryOptions.NetworkMode == default)
             _queryOptions.NetworkMode = _client.DefaultNetworkMode;
 
@@ -445,7 +489,7 @@ public class UseQuery<T> : IDisposable
                 {
                     var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token, _queryOptions.Meta);
                     var fetchedData = await _client.FetchAsync(_queryOptions.QueryKey,
-                                                    _ => _queryOptions.QueryFn(ctx),
+                                                    _ => _queryOptions.QueryFn!(ctx),
                                                     _queryOptions.StaleTime,
                                                     token);
 

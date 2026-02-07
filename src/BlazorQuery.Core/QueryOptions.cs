@@ -7,7 +7,7 @@ public class QueryOptions<T>
 {
     public QueryOptions(
         QueryKey queryKey, 
-        Func<QueryFunctionContext, Task<T>> queryFn, 
+        Func<QueryFunctionContext, Task<T>>? queryFn = null,
         TimeSpan? staleTime = null, 
         NetworkMode networkMode = NetworkMode.Online,
         bool refetchOnReconnect = true,
@@ -50,7 +50,7 @@ public class QueryOptions<T>
     }
 
     public QueryKey QueryKey { get; init; } = null!;
-    public Func<QueryFunctionContext, Task<T>> QueryFn { get; init; } = null!;
+    public Func<QueryFunctionContext, Task<T>>? QueryFn { get; init; }
     public TimeSpan StaleTime { get; init; } = TimeSpan.Zero;
     public NetworkMode NetworkMode { get; set; } = NetworkMode.Online;
     public bool RefetchOnReconnect { get; set; } = true;

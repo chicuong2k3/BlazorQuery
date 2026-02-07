@@ -17,6 +17,12 @@ public class QueryClient : IDisposable
     /// </summary>
     public bool DefaultRefetchOnWindowFocus { get; set; } = true;
     
+    /// <summary>
+    /// Default query function to use for all queries unless overridden.
+    /// The function receives the QueryKey and can determine what to fetch based on it.
+    /// </summary>
+    public Func<QueryFunctionContext, Task<object>>? DefaultQueryFn { get; set; }
+    
     private int _fetchingQueriesCount = 0;
     
     /// <summary>
