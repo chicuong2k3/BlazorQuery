@@ -169,6 +169,131 @@ Before committing changes, verify:
 - [ ] Comments explain complex logic
 - [ ] No breaking changes (or documented)
 
+---
+
+## PR Review: React Query Feature Parity Checklist
+
+When reviewing PRs, verify the implementation matches React Query behavior. Use the official docs as the source of truth: https://tanstack.com/query/latest/docs/framework/react/overview
+
+### Query State & Status
+
+| Feature | React Query | BlazorQuery | Check |
+|---------|-------------|-------------|-------|
+| `status: 'pending'` | No data, no error | `Status == QueryStatus.Pending` | ✅ |
+| `status: 'error'` | Has error (even with stale data) | `Status == QueryStatus.Error` | ✅ |
+| `status: 'success'` | Has data, no error | `Status == QueryStatus.Success` | ✅ |
+| `fetchStatus: 'fetching'` | Actively fetching | `FetchStatus == FetchStatus.Fetching` | ✅ |
+| `fetchStatus: 'paused'` | Paused (offline) | `FetchStatus == FetchStatus.Paused` | ✅ |
+| `fetchStatus: 'idle'` | Not fetching | `FetchStatus == FetchStatus.Idle` | ✅ |
+| `isLoading` | `isPending && isFetching` | `IsLoading` | ✅ |
+| `isPending` | status === 'pending' | `IsPending` | ✅ |
+| `isSuccess` | status === 'success' | `IsSuccess` | ✅ |
+| `isError` | status === 'error' | `IsError` | ✅ |
+| `isFetching` | fetchStatus === 'fetching' | `IsFetching` | ✅ |
+| `isPaused` | fetchStatus === 'paused' | `IsPaused` | ✅ |
+
+### Retry Behavior
+
+| Feature | React Query | BlazorQuery | Check |
+|---------|-------------|-------------|-------|
+| `retry: false` | No retries | `Retry = 0` or not set | ✅ |
+| `retry: 3` | 3 retries (4 total attempts) | `Retry = 3` → 3 retries | ✅ |
+| `retry: true` | Infinite retries | `RetryInfinite = true` | ✅ |
+| `retry: (count, err) => bool` | Custom logic | `RetryFunc` | ✅ |
+| `failureCount` | Starts at 0 | `FailureCount` | ✅ |
+| `failureReason` | Error during retries | `FailureReason` | ✅ |
+| Default delay | `1000 * 2^attemptIndex` | Same formula | ✅ |
+| Max delay | 30 seconds | `MaxRetryDelay` | ✅ |
+| `retryDelay: (attempt) => ms` | Custom delay | `RetryDelayFunc` | ✅ |
+
+### Network Mode Behavior
+
+| Feature | React Query | BlazorQuery | Check |
+|---------|-------------|-------------|-------|
+| Online mode - offline | Pauses fetch | Sets `FetchStatus.Paused` | ✅ |
+| Online mode - reconnect | Continues/refetches | Continues from pause | ✅ |
+| Always mode | Ignores network | Never pauses | ✅ |
+| OfflineFirst mode | First fetch proceeds | Then pauses if offline | ✅ |
+| Pause during fetch | Cancels and pauses | `_currentCts.Cancel()` | ✅ |
+| Pause during retry | Pauses retry loop | Semaphore wait | ✅ |
+| Continue vs refetch | Continue from pause | Not a new fetch | ✅ |
+| Cancelled while paused | Won't continue | Checks `signal.IsCancellationRequested` | ✅ |
+
+### Stale Time & Caching
+
+| Feature | React Query | BlazorQuery | Check |
+|---------|-------------|-------------|-------|
+| `staleTime: 0` | Always stale | Default behavior | ✅ |
+| `staleTime: Infinity` | Never stale | Large TimeSpan | ✅ |
+| Background refetch | Refetch stale data | `IsFetchingBackground` | ✅ |
+| Cache sharing | Shared by queryKey | `QueryClient` cache | ✅ |
+
+### Refetch Behavior
+
+| Feature | React Query | BlazorQuery | Check |
+|---------|-------------|-------------|-------|
+| `refetchOnReconnect` | Refetch on network return | `RefetchOnReconnect` | ✅ |
+| `refetchInterval` | Polling interval | `RefetchInterval` | ✅ |
+| `refetchIntervalInBackground` | Continue when tab hidden | ❌ Not implemented | ⚠️ |
+
+### Query Function Context
+
+| Feature | React Query | BlazorQuery | Check |
+|---------|-------------|-------------|-------|
+| `queryKey` | Array of keys | `QueryKey` | ✅ |
+| `signal` | AbortSignal | `CancellationToken` | ✅ |
+| `meta` | Optional metadata | `Meta` | ✅ |
+| Destructuring | `({ queryKey, signal })` | `var (key, signal) = ctx` | ✅ |
+
+### PR Review Questions
+
+When reviewing a PR, ask these questions:
+
+1. **Does it match React Query?**
+   - Check the corresponding React Query docs page
+   - Verify property names, behavior, and edge cases
+   - Note any intentional deviations with justification
+
+2. **Is the implementation complete?**
+   - All related properties exposed (e.g., `FailureReason` with `FailureCount`)
+   - Appropriate events/notifications fired on state changes
+   - Edge cases handled (offline, cancelled, disposed)
+
+3. **Are tests comprehensive?**
+   - Test matches React Query expected behavior
+   - Edge cases covered (offline mid-fetch, cancel while paused)
+   - No flaky tests
+
+4. **Is documentation updated?**
+   - Markdown docs reflect new behavior
+   - Code comments explain React Query compatibility
+   - Deviations documented with reasons
+
+5. **Is it thread-safe?**
+   - No `new Random()` (use `Random.Shared`)
+   - Async locks use `SemaphoreSlim`
+   - Shared state properly protected
+
+### Known Deviations from React Query
+
+Document any intentional differences here:
+
+| Feature | React Query | BlazorQuery | Reason |
+|---------|-------------|-------------|--------|
+| `refetchIntervalInBackground` | Pauses when tab hidden | Not implemented | Blazor doesn't have native tab visibility API; requires JS interop |
+| Suspense support | Built-in | Not applicable | C# doesn't have Suspense pattern |
+| SSR hydration | Supported | Different approach | Blazor Server has different lifecycle |
+
+### Quick Reference: React Query Docs Links
+
+- [Query Basics](https://tanstack.com/query/latest/docs/framework/react/guides/queries)
+- [Query Keys](https://tanstack.com/query/latest/docs/framework/react/guides/query-keys)
+- [Query Functions](https://tanstack.com/query/latest/docs/framework/react/guides/query-functions)
+- [Network Mode](https://tanstack.com/query/latest/docs/framework/react/guides/network-mode)
+- [Query Retries](https://tanstack.com/query/latest/docs/framework/react/guides/query-retries)
+- [Caching](https://tanstack.com/query/latest/docs/framework/react/guides/caching)
+- [Mutations](https://tanstack.com/query/latest/docs/framework/react/guides/mutations)
+
 ## References
 
 - React Query Docs: https://tanstack.com/query/latest/docs/framework/react/overview
