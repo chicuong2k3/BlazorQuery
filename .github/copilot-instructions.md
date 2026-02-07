@@ -63,11 +63,16 @@ Implement three network modes:
 - **OfflineFirst**: Try once, then pause if offline
 
 ### 5. Retry Logic
-**Important deviation from React Query:**
-- BlazorQuery: `retry: 3` = max 3 total attempts (initial + 2 retries)
+**Matches React Query exactly:**
+- BlazorQuery: `retry: 3` = 3 retries after initial attempt (4 total attempts)
 - React Query: `retry: 3` = 3 retries after initial (4 total attempts)
+- ✅ Same behavior!
 
-This is an intentional design choice for simplicity. Document this clearly.
+**Implementation details:**
+- `attemptIndex` starts at 0 for first RETRY (not initial attempt)
+- `retryDelayFunc` receives `attemptIndex` (0 = first retry)
+- Default delay: `Math.Min(1000 * 2^attemptIndex, 30000)`
+- No jitter in default (matches React Query)
 
 ### 6. Documentation Requirements
 
