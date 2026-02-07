@@ -161,7 +161,6 @@ public class UseQueryNetworkModeTests : UseQueryTestsBase
         await query.ExecuteAsync();
         await Task.Delay(50);
         SetOnline(true);
-        _onlineManagerMock.Raise(m => m.OnlineStatusChanged += null);
         await Task.Delay(100);
         var snapshots = observer.Snapshots;
         var final = snapshots.Last();
@@ -199,17 +198,16 @@ public class UseQueryNetworkModeTests : UseQueryTestsBase
         var fetchTask = query.ExecuteAsync();
 
         // Simulate going offline mid-fetch
+        // SetOnline now raises the event which cancels the fetch
         SetOnline(false);
-        query.HandleOffline();
 
         // Swallow cancellation
         try { await fetchTask; } catch (OperationCanceledException) { }
 
         Assert.Equal(FetchStatus.Paused, query.FetchStatus);
 
-        // Reconnect
+        // Reconnect - SetOnline now raises the event automatically
         SetOnline(true);
-        _onlineManagerMock.Raise(m => m.OnlineStatusChanged += null);
 
         await Task.Yield();
 

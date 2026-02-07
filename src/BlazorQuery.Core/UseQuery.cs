@@ -79,10 +79,22 @@ public class UseQuery<T> : IDisposable
     public int FailureCount { get; private set; }
     public bool IsRefetchError { get; private set; }
 
+    /// <summary>
+    /// The error from the most recent retry attempt.
+    /// Available during retry attempts before the final error is set.
+    /// After the last retry fails, this becomes the Error property.
+    /// </summary>
+    public Exception? FailureReason => _lastError;
+
     public event Action? OnChange;
     private readonly Action _onlineStatusHandler;
     private CancellationTokenSource? _staleTimerCts;
     private CancellationTokenSource? _refetchIntervalCts;
+    
+    /// <summary>
+    /// Used to pause/resume retry when network goes offline/online during fetch
+    /// </summary>
+    private readonly SemaphoreSlim _pauseRetrySemaphore = new(0, 1);
 
 
     public UseQuery(
@@ -101,7 +113,10 @@ public class UseQuery<T> : IDisposable
             _queryOptions.RefetchOnReconnect = false;
 
         _onlineStatusHandler = () => _ = SafeHandleOnlineStatusChangedAsync();
-        if (_queryOptions.RefetchOnReconnect)
+        // Subscribe to network changes for:
+        // 1. Pause/continue behavior (NetworkMode != Always)
+        // 2. RefetchOnReconnect behavior
+        if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
         {
             _onlineManager.OnlineStatusChanged += _onlineStatusHandler;
         }
@@ -125,26 +140,62 @@ public class UseQuery<T> : IDisposable
     }
     private Task OnOnlineStatusChangedAsync()
     {
+        // Handle going offline - pause any in-progress fetch
         if (!_onlineManager.IsOnline)
+        {
+            if (_queryOptions.NetworkMode != NetworkMode.Always && FetchStatus == FetchStatus.Fetching)
+            {
+                // Cancel the current fetch - this will trigger OperationCanceledException
+                // which sets FetchStatus to Paused (see catch block in ExecuteAsync)
+                _currentCts?.Cancel();
+            }
             return Task.CompletedTask;
+        }
+
+        // If query is paused (mid-retry), signal to continue
+        // This is DIFFERENT from refetchOnReconnect - this continues existing fetch
+        if (FetchStatus == FetchStatus.Paused)
+        {
+            // Release the semaphore to continue the paused retry
+            bool wasSomeoneWaiting = false;
+            try
+            {
+                if (_pauseRetrySemaphore.CurrentCount == 0)
+                {
+                    _pauseRetrySemaphore.Release();
+                    // If count is still 0 after release, someone consumed it (was waiting)
+                    wasSomeoneWaiting = _pauseRetrySemaphore.CurrentCount == 0;
+                }
+            }
+            catch (SemaphoreFullException)
+            {
+                // Already released, ignore
+            }
+
+            // If someone was waiting on the semaphore, they will continue the fetch
+            if (wasSomeoneWaiting)
+                return Task.CompletedTask;
+
+            // No one was waiting - this means we paused before actually starting
+            // Fall through to refetch logic below
+        }
 
         // if there's already a fetch in progress, don't start another
         if (FetchStatus == FetchStatus.Fetching)
             return Task.CompletedTask;
 
-        var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
-        var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
-                                        (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
-
-        if (FetchStatus == FetchStatus.Paused)
+        // This is refetchOnReconnect behavior - start new fetch for stale data
+        // Applies to NetworkMode.Online and NetworkMode.OfflineFirst when RefetchOnReconnect is enabled
+        if (_queryOptions.RefetchOnReconnect && _queryOptions.NetworkMode != NetworkMode.Always)
         {
-            _ = ExecuteAsync(); 
-            return Task.CompletedTask;
-        }
+            var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
+            var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
+                                            (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
 
-        if (_queryOptions.NetworkMode == NetworkMode.OfflineFirst && isDataStale)
-        {
-            _ = ExecuteAsync();
+            if (isDataStale)
+            {
+                _ = ExecuteAsync();
+            }
         }
 
         return Task.CompletedTask;
@@ -283,11 +334,26 @@ public class UseQuery<T> : IDisposable
                         break;
                     }
 
-                    // pause retry if offline
+                    // pause retry if offline, wait for online, then continue
+                    // This is NOT a refetch - it continues from current attempt
                     if (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
                     {
                         FetchStatus = FetchStatus.Paused;
-                        return;
+                        Notify();
+                        
+                        // Wait for network to come back online
+                        // The semaphore will be released by OnOnlineStatusChangedAsync
+                        await _pauseRetrySemaphore.WaitAsync(token);
+                        
+                        // Check if still online and not cancelled
+                        if (!_onlineManager.IsOnline || token.IsCancellationRequested)
+                        {
+                            FetchStatus = FetchStatus.Paused;
+                            return;
+                        }
+                        
+                        // Resume - set back to Fetching and continue retry loop
+                        FetchStatus = FetchStatus.Fetching;
                     }
 
                     // delay before retry - use attempt index for exponential backoff
@@ -305,7 +371,61 @@ public class UseQuery<T> : IDisposable
                         delayMs = (int)Math.Min(expDelay + jitter, maxRetryDelay.TotalMilliseconds);
                     }
 
-                    await Task.Delay(delayMs, token);
+                    try
+                    {
+                        await Task.Delay(delayMs, token);
+                    }
+                    catch (OperationCanceledException) when (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
+                    {
+                        // Delay was cancelled because we went offline - pause and wait for reconnect
+                        FetchStatus = FetchStatus.Paused;
+                        Notify();
+
+                        // Wait without token since we were cancelled for going offline, not user cancellation
+                        // If disposed, semaphore.Dispose() will interrupt this wait
+                        try
+                        {
+                            await _pauseRetrySemaphore.WaitAsync();
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // Query was disposed while paused
+                            return;
+                        }
+
+                        // Check if user cancelled while we were paused
+                        if (signal.HasValue && signal.Value.IsCancellationRequested)
+                        {
+                            FetchStatus = FetchStatus.Paused;
+                            return;
+                        }
+
+                        if (!_onlineManager.IsOnline)
+                        {
+                            FetchStatus = FetchStatus.Paused;
+                            return;
+                        }
+
+                        FetchStatus = FetchStatus.Fetching;
+                        continue; // Continue retry loop after resume
+                    }
+
+                    // Check if we went offline DURING the delay (without cancellation)
+                    if (_queryOptions.NetworkMode != NetworkMode.Always && !_onlineManager.IsOnline)
+                    {
+                        FetchStatus = FetchStatus.Paused;
+                        Notify();
+
+                        await _pauseRetrySemaphore.WaitAsync(token);
+
+                        if (!_onlineManager.IsOnline || token.IsCancellationRequested)
+                        {
+                            FetchStatus = FetchStatus.Paused;
+                            return;
+                        }
+
+                        FetchStatus = FetchStatus.Fetching;
+                    }
                 }
             }
 
@@ -416,7 +536,7 @@ public class UseQuery<T> : IDisposable
     {
         try
         {
-            if (_queryOptions.RefetchOnReconnect)
+            if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
                 _onlineManager.OnlineStatusChanged -= _onlineStatusHandler;
         }
         catch
@@ -434,6 +554,7 @@ public class UseQuery<T> : IDisposable
         _refetchIntervalCts?.Dispose();
 
         _fetchLock.Dispose();
+        _pauseRetrySemaphore.Dispose();
     }
 
 }

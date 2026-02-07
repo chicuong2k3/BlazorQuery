@@ -19,6 +19,7 @@ public class UseQueryTestsBase
     protected void SetOnline(bool isOnline)
     {
         _onlineManagerMock.Setup(m => m.IsOnline).Returns(isOnline);
+        _onlineManagerMock.Raise(m => m.OnlineStatusChanged += null);
     }
 
     protected static async Task<List<string>> FakeNetworkApi()
