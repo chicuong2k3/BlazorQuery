@@ -36,6 +36,7 @@ A powerful asynchronous state management library for Blazor, inspired by [TanSta
 - [18. Scroll Restoration](./18.%20Scroll%20Restoration.md) - Automatic scroll position preservation
 - [19. Default Query Function](./19.%20Default%20Query%20Function.md) - Shared query function for entire app
 - [20. Render Optimizations](./20.%20Render%20Optimizations.md) - Optimize component re-rendering performance
+- [22. Logging and Error Handling](./22.%20Logging%20and%20Error%20Handling.md) - Production-ready logging and diagnostics
 
 ## 🚀 Quick Start
 
