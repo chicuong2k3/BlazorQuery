@@ -29,9 +29,26 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
         working-directory: ./docs/SwrSharp.Doc
-      - name: Publish static site
-        run: dotnet run --configuration Release --no-build
+      - name: Publish
+        run: dotnet publish --configuration Release --no-build --output publish
         working-directory: ./docs/SwrSharp.Doc
+      - name: Generate static site
+        run: |
+          cd publish
+          dotnet SwrSharp.Doc.dll
+        working-directory: ./docs/SwrSharp.Doc
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+      - name: List output (debug)
+        run: |
+          echo "=== Checking directories ==="
+          ls -la ./docs/SwrSharp.Doc/ | head -20
+          if [ -d "./docs/SwrSharp.Doc/output" ]; then
+            echo "=== Output directory found ==="
+            ls -la ./docs/SwrSharp.Doc/output | head -20
+          else
+            echo "=== Output directory NOT found ==="
+          fi
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
