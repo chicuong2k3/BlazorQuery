@@ -1,9 +1,10 @@
 ---
 title: "Dependent Queries"
-description: "Guide for Dependent Queries in SwrSharp"
-order: 07
+description: "Queries based on other results"
+order: 7
 category: "Guides"
 ---
+
 # Dependent Queries
 
 Dependent (or serial) queries depend on previous ones to finish before they can execute. This creates a request chain where each query waits for the previous one to complete.
@@ -451,16 +452,3 @@ await projectsQuery.ExecuteAsync();
 - SwrSharp requires explicit `await query.ExecuteAsync()` calls
 - React Query's hooks execute automatically when enabled
 - SwrSharp uses `!string.IsNullOrEmpty()` instead of `!!` operator
-
----
-
-## Summary
-
-- ✅ Use `enabled: false` to prevent query execution
-- ✅ Set `enabled: true` when dependency is ready
-- ✅ Query states: `Pending + Idle` → `Pending + Fetching` → `Success + Idle`
-- ✅ Works with both `UseQuery` and `UseQueries`
-- ✅ Can be dynamically enabled/disabled via `options.Enabled`
-- ⚠️ Creates request waterfalls - consider backend restructuring
-- ✅ Good for incremental loading UX
-

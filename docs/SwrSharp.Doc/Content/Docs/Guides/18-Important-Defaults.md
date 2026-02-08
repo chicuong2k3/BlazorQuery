@@ -1,9 +1,10 @@
 ---
 title: "Important Defaults"
-description: "Guide for Important Defaults in SwrSharp"
+description: "Default configuration"
 order: 18
 category: "Guides"
 ---
+
 # Important Defaults
 
 Out of the box, SwrSharp is configured with **aggressive but sane** defaults. **Sometimes these defaults can catch new users off guard or make learning/debugging difficult if they are unknown by the user.** Keep them in mind as you continue to learn and use SwrSharp:
@@ -425,25 +426,3 @@ refetchOnWindowFocus: false,           // No refetch on focus
 refetchOnReconnect: false,             // No refetch on reconnect
 retry: 5                               // More retries for reliability
 ```
-
----
-
-## Further Reading
-
-For in-depth understanding of these concepts, see:
-- [4. Query Retries](./4.%20Query%20Retries.md)
-- [3. Network Mode](./3.%20Network%20Mode.md)
-- [10. Window Focus Refetching](./10.%20Window%20Focus%20Refetching.md)
-- [15. Query Invalidation](./15.%20Query%20Invalidation.md)
-
-## Summary
-
-✅ **Default staleTime**: `TimeSpan.Zero` (always stale)  
-✅ **Default retry**: 3 retries with exponential backoff  
-✅ **Default refetch**: On window focus and network reconnect  
-✅ **Default network mode**: Online (pause when offline)  
-✅ **Manual disposal**: Always call `Dispose()` to prevent leaks  
-✅ **Reference equality**: Data changes trigger OnChange event  
-
-**Understanding these defaults is key to using SwrSharp effectively!** 🎯
-

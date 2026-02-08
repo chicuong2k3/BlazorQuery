@@ -1,9 +1,10 @@
 ---
 title: "Filters"
-description: "Guide for Filters in SwrSharp"
+description: "Filtering queries"
 order: 16
 category: "Guides"
 ---
+
 # Filters
 
 Some methods within SwrSharp accept a `QueryFilters` object.
@@ -390,19 +391,3 @@ queryClient.InvalidateQueries(new QueryFilters
   }
 });
 ```
-
----
-
-## Summary
-
-- ✅ `QueryFilters` for precise query matching
-- ✅ `QueryKey` - prefix or exact matching
-- ✅ `Type` - active/inactive/all
-- ✅ `Stale` - fresh/stale filtering
-- ✅ `FetchStatus` - fetching/paused/idle
-- ✅ `Predicate` - custom matching logic
-- ✅ Combine multiple filters with AND logic
-- ✅ Flexible and powerful query selection
-
-**Use filters for precise control over which queries to invalidate, refetch, or remove!** 🎯
-

@@ -104,6 +104,33 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #484f58;
         }
+
+        /* Responsive images in prose content */
+        .prose img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Responsive tables - horizontal scroll */
+        .prose table {
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Code blocks don't overflow on mobile */
+        .prose pre {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Prevent long inline code from breaking layout */
+        .prose code {
+            word-break: break-word;
+        }
+        .prose pre code {
+            word-break: normal;
+        }
     </style>
 
     <HeadOutlet/>

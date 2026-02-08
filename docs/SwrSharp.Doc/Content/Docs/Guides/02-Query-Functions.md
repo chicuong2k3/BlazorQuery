@@ -1,3 +1,10 @@
+---
+title: "Query Functions"
+description: "Writing query functions"
+order: 2
+category: "Guides"
+---
+
 ﻿
 # What is a Query Function?
 

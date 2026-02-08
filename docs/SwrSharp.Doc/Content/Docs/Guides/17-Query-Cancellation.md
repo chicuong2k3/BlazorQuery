@@ -1,9 +1,10 @@
 ---
 title: "Query Cancellation"
-description: "Guide for Query Cancellation in SwrSharp"
+description: "Cancelling queries"
 order: 17
 category: "Guides"
 ---
+
 # Query Cancellation
 
 SwrSharp provides each query function with a `CancellationToken` through the `QueryFunctionContext`. When a query becomes out-of-date or inactive, this token can be cancelled. This means that all queries are cancellable, and you can respond to the cancellation inside your query function if desired. The best part about this is that it allows you to continue to use normal async/await syntax while getting all the benefits of automatic cancellation.
@@ -503,19 +504,3 @@ queryClient.CancelQueries(
     new CancelOptions { Silent = true }
 );
 ```
-
----
-
-## Summary
-
-- ✅ Every query function receives `CancellationToken` via `ctx.Signal`
-- ✅ Pass token to all async operations (HttpClient, Task.Delay, etc.)
-- ✅ Manual cancellation via `CancelQueries()`
-- ✅ Cancel with filters (prefix, exact, predicate)
-- ✅ `CancelOptions` for silent/revert control
-- ✅ Default behavior: cancellation reverts state
-- ✅ Perfect for: long-running requests, user cancellation, timeouts
-- ✅ Standard .NET `CancellationToken` - works with all APIs
-
-**Use cancellation for better UX and resource management!** 🎯
-

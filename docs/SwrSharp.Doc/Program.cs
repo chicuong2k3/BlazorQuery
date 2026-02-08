@@ -45,11 +45,10 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>();
 
-// Only generate static site in production
-if (!app.Environment.IsDevelopment())
-{
-    app.UseBlazorStaticGenerator(shutdownApp: true);
-}
+// UseBlazorStaticGenerator must be called in all environments so that
+// ParseAndAddPosts() runs and ContentService.Posts gets populated.
+// In Development, shutdownApp: false keeps the server running.
+app.UseBlazorStaticGenerator(shutdownApp: !app.Environment.IsDevelopment());
 
 app.Run();
 

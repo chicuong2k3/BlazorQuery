@@ -1,9 +1,10 @@
 ---
 title: "Overview"
-description: "Getting started with SwrSharp for Blazor applications"
+description: "Introduction to SwrSharp"
 order: 1
 category: "Getting Started"
 ---
+
 
 # Overview
 
@@ -89,4 +90,3 @@ SwrSharp is a powerful data fetching and caching library for Blazor applications
 - Learn about [Query Keys](/docs/guides/query-keys)
 - Understand [Query Functions](/docs/guides/query-functions)
 - Explore [Network Modes](/docs/guides/network-mode)
-

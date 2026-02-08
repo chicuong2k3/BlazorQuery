@@ -1,9 +1,10 @@
 ---
 title: "Scroll Restoration"
-description: "Guide for Scroll Restoration in SwrSharp"
+description: "Restoring scroll position"
 order: 19
 category: "Guides"
 ---
+
 
 # Scroll Restoration
 
@@ -83,4 +84,3 @@ new QueryOptions
 - Only works with browser back/forward navigation
 - May not work with all client-side routing scenarios
 - Requires explicit component implementation
-

@@ -1,9 +1,10 @@
 ---
 title: "Default Query Function"
-description: "Guide for Default Query Function in SwrSharp"
+description: "Global default function"
 order: 23
 category: "Guides"
 ---
+
 # Default Query Function
 SwrSharp allows you to set a default query function that will be used for all queries that don't specify their own.
 ## Overview

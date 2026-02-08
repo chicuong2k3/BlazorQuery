@@ -1,9 +1,10 @@
 ---
 title: "QueryClient"
-description: "API reference for the QueryClient service"
+description: "QueryClient API reference"
 order: 3
 category: "API"
 ---
+
 
 # QueryClient
 
@@ -208,4 +209,3 @@ else if (TodosQuery?.Data != null)
 - [Query Invalidation](/docs/guides/query-invalidation)
 - [Query Cancellation](/docs/guides/query-cancellation)
 - [Using Filters](/docs/guides/filters)
-

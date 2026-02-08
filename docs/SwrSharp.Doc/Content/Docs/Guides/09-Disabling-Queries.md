@@ -1,9 +1,10 @@
 ---
 title: "Disabling Queries"
-description: "Guide for Disabling Queries in SwrSharp"
-order: 09
+description: "Conditionally disable queries"
+order: 9
 category: "Guides"
 ---
+
 # Disabling/Pausing Queries
 
 If you ever want to disable a query from automatically running, you can use the `enabled: false` option.
@@ -561,18 +562,3 @@ var query = new UseQuery<Data>(
     queryClient
 );
 ```
-
----
-
-## Summary
-
-- ✅ Use `enabled: false` to disable automatic query execution
-- ✅ Prefer **lazy queries** (conditional enabled) over permanent disabling
-- ✅ Use `IsLoading` (not `IsPending`) for disabled query loading states
-- ✅ Disabled queries with cached data start in `Success` state
-- ✅ Disabled queries without cache start in `Pending + Idle` state
-- ✅ Manual fetch requires enabling query first (or temporarily)
-- ✅ Disabled queries ignore invalidations and background refetches
-- ✅ Great for: filters, conditional data, user-triggered loads
-- ❌ Avoid: permanent disabling when you want background updates
-
