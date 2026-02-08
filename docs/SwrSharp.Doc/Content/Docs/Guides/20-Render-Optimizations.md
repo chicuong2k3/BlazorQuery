@@ -1,9 +1,10 @@
 ---
 title: "Render Optimizations"
-description: "Guide for Render Optimizations in SwrSharp"
+description: "Performance optimizations"
 order: 20
 category: "Guides"
 ---
+
 
 # Render Optimizations
 
@@ -189,4 +190,3 @@ new QueryOptions
 4. **Memoize computations**: Cache expensive calculations
 5. **Monitor performance**: Use browser DevTools to identify bottlenecks
 6. **Lazy load**: Load data only when needed
-

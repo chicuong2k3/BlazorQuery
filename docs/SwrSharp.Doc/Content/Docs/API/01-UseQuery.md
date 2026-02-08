@@ -1,9 +1,10 @@
 ---
 title: "UseQuery"
-description: "API reference for the UseQuery hook"
+description: "UseQuery API reference"
 order: 1
 category: "API"
 ---
+
 
 # UseQuery
 
@@ -130,4 +131,3 @@ public class UseQueryResult<T>
 - [UseInfiniteQuery](/docs/api/use-infinite-query)
 - [QueryClient](/docs/api/query-client)
 - [Query Options](/docs/guides/query-options)
-

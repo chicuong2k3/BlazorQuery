@@ -1,9 +1,10 @@
 ---
 title: "Initial Query Data"
-description: "Guide for Initial Query Data in SwrSharp"
+description: "Providing initial data"
 order: 11
 category: "Guides"
 ---
+
 # Initial Query Data
 
 There are many ways to supply initial data for a query to the cache before you need it:
@@ -464,17 +465,3 @@ var query = new UseQuery<Todo>(
     queryClient
 );
 ```
-
----
-
-## Summary
-
-- ✅ Use `initialData` to prepopulate query cache with complete data
-- ✅ Use `initialDataFunc` for expensive computations (lazy evaluation)
-- ✅ Use `initialDataUpdatedAt` for accurate staleness checking
-- ✅ Get initial data from cache with `GetQueryData` or `GetQueryState`
-- ✅ Use conditional logic to only use fresh cached data
-- ✅ `staleTime` determines when to refetch based on `initialDataUpdatedAt`
-- ✅ Initial data is persisted to cache (don't use for placeholders)
-- ✅ Perfect for: local storage, cached list → detail, expensive computations
-

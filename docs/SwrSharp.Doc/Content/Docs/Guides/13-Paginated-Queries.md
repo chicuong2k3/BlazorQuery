@@ -1,9 +1,10 @@
 ---
 title: "Paginated Queries"
-description: "Guide for Paginated Queries in SwrSharp"
+description: "Implementing pagination"
 order: 13
 category: "Guides"
 ---
+
 # Paginated / Lagged Queries
 
 Rendering paginated data is a very common UI pattern and in SwrSharp, it "just works" by including the page information in the query key:
@@ -545,19 +546,3 @@ if (query.IsPending)
     return LoadingScreen(); // Can't distinguish first vs subsequent
 }
 ```
-
----
-
-## Summary
-
-- ✅ Use `placeholderDataFunc: (prev, _) => prev` for pagination
-- ✅ `IsPlaceholderData` flag indicates showing old data while loading new
-- ✅ Prevents UI flicker between pages
-- ✅ Better UX - content always visible
-- ✅ Disable next button with `!IsPlaceholderData` check
-- ✅ Show subtle loading indicator during transition
-- ✅ Works with offset-based and cursor-based pagination
-- ✅ Handle first load differently (full loading screen)
-
-**Result**: Smooth, flicker-free pagination experience! 🚀
-

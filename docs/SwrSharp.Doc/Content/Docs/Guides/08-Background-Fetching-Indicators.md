@@ -1,9 +1,10 @@
 ---
-title: "Background Fetching Indicators"
-description: "Guide for Background Fetching Indicators in SwrSharp"
-order: 08
+title: "Background Fetching"
+description: "Background refetch indicators"
+order: 8
 category: "Guides"
 ---
+
 # Background Fetching Indicators
 
 A query's `Status == QueryStatus.Pending` state is sufficient to show the initial hard-loading state for a query, but sometimes you may want to display an additional indicator that a query is refetching in the background. To do this, queries provide you with an `IsFetching` boolean that you can use to show that it's in a fetching state, regardless of the state of the `Status` variable.
@@ -538,16 +539,3 @@ public class GlobalLoader
 - React Query: `useIsFetching()` hook
 - SwrSharp: `QueryClient.IsFetching` property + `OnFetchingChanged` event
 - Both provide same functionality, adapted for platform
-
----
-
-## Summary
-
-- ✅ Use `query.IsFetching` to show individual query fetching state
-- ✅ Use `query.IsFetchingBackground` to distinguish background refetch from initial load
-- ✅ Use `queryClient.IsFetching` for global fetching indicator
-- ✅ Subscribe to `queryClient.OnFetchingChanged` for reactive updates
-- ✅ Show subtle indicators during background fetch (don't block UI)
-- ✅ Use global indicator for app-wide sync status
-- ✅ Perfect for progress bars, spinners, and loading badges
-

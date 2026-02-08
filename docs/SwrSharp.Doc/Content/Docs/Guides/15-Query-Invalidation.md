@@ -1,9 +1,10 @@
 ---
 title: "Query Invalidation"
-description: "Guide for Query Invalidation in SwrSharp"
+description: "Invalidating queries"
 order: 15
 category: "Guides"
 ---
+
 # Query Invalidation
 
 Waiting for queries to become stale before they are fetched again doesn't always work, especially when you know for a fact that a query's data is out of date because of something the user has done. For that purpose, the `QueryClient` has an `InvalidateQueries` method that lets you intelligently mark queries as stale and potentially refetch them too!
@@ -520,19 +521,3 @@ queryClient.InvalidateQueries(new QueryFilters
     }
 });
 ```
-
----
-
-## Summary
-
-- ✅ `InvalidateQueries()` marks queries as stale
-- ✅ Active queries automatically refetch
-- ✅ Overrides `staleTime` configuration
-- ✅ Prefix matching (default) - matches "todos", "todos"/1, etc.
-- ✅ Exact matching - only exact key match
-- ✅ Custom predicates - full control
-- ✅ Perfect for: after mutations, user actions, background sync
-- ✅ Targeted invalidation > manual cache updates
-
-**Use invalidation instead of manual cache manipulation for cleaner, more maintainable code!** 🚀
-

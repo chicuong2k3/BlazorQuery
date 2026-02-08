@@ -1,3 +1,10 @@
+---
+title: "Network Mode"
+description: "Handling network states"
+order: 3
+category: "Guides"
+---
+
 ﻿﻿﻿
 # Overview
 
@@ -81,4 +88,3 @@ in progress). Equivalent to `FetchStatus == Fetching`.
 In React Query terms: `isLoading = isPending && (isFetching || isPaused)`. 
 This means `IsLoading` is true when there's no data yet AND the query is either 
 actively fetching or paused due to network conditions.
-

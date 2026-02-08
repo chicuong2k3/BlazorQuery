@@ -1,9 +1,10 @@
 ---
 title: "Placeholder Query Data"
-description: "Guide for Placeholder Query Data in SwrSharp"
+description: "Using placeholder data"
 order: 12
 category: "Guides"
 ---
+
 # Placeholder Query Data
 
 ## What is Placeholder Data?
@@ -433,23 +434,3 @@ var query = new UseQuery<List<Post>>(
     queryClient
 );
 ```
-
----
-
-## Summary
-
-- ✅ `placeholderData`: NOT persisted to cache (temporary display)
-- ✅ `IsPlaceholderData`: flag to distinguish from real data
-- ✅ Query starts in `Success` state (has data to display)
-- ✅ Use for partial/preview data while fetching complete data
-- ✅ `placeholderDataFunc`: access to previousData for transitions
-- ✅ Perfect for: blog preview → full content, pagination, smooth transitions
-- ✅ `initialData` takes priority over `placeholderData`
-- ✅ Placeholder is replaced when real data arrives
-
-**When to use**:
-- ✅ Preview/partial data from list → detail
-- ✅ Smooth page transitions
-- ✅ Reduce perceived loading time
-- ❌ Don't use for complete/real data (use `initialData`)
-

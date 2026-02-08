@@ -1,3 +1,10 @@
+---
+title: "Query Options"
+description: "Query configuration options"
+order: 5
+category: "Guides"
+---
+
 # Query Options - Reusable Query Configurations
 
 ## Overview
@@ -268,4 +275,3 @@ Using factory methods to create reusable `QueryOptions<T>` provides:
 - ✅ Reduced boilerplate
 
 This pattern is equivalent to React Query's `queryOptions` helper, but leverages C#'s type system and doesn't require a special helper function.
-

@@ -1,9 +1,10 @@
 ---
 title: "UseInfiniteQuery"
-description: "API reference for the UseInfiniteQuery hook"
+description: "UseInfiniteQuery API reference"
 order: 2
 category: "API"
 ---
+
 
 # UseInfiniteQuery
 
@@ -121,4 +122,3 @@ public class UseInfiniteQueryResult<T>
 - [Infinite Queries Guide](/docs/guides/infinite-queries)
 - [Paginated Queries Guide](/docs/guides/paginated-queries)
 - [UseQuery](/docs/api/use-query)
-

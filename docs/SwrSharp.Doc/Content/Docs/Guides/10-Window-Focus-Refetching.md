@@ -1,9 +1,10 @@
 ---
 title: "Window Focus Refetching"
-description: "Guide for Window Focus Refetching in SwrSharp"
+description: "Refetch on window focus"
 order: 10
 category: "Guides"
 ---
+
 # Window Focus Refetching
 
 If a user leaves your application and returns and the query data is stale, **SwrSharp automatically requests fresh data for you in the background**. You can disable this globally or per-query using the `refetchOnWindowFocus` option.
@@ -578,18 +579,3 @@ queryClient.FocusManager.SetEventListener((handleFocus) => {
     return () => { /* cleanup */ };
 });
 ```
-
----
-
-## Summary
-
-- ✅ Use `refetchOnWindowFocus: true` (default) for automatic stale data updates
-- ✅ Implement `IFocusManager` for your platform (Blazor, WPF, Avalonia, MAUI)
-- ✅ Disable globally via `QueryClient.DefaultRefetchOnWindowFocus`
-- ✅ Disable per-query via `refetchOnWindowFocus: false`
-- ✅ Only refetches when data is stale
-- ✅ Only refetches when window **gains** focus (not loses)
-- ✅ Won't refetch if already fetching
-- ✅ Won't refetch if query is disabled
-- ✅ Platform-agnostic with extensible architecture
-

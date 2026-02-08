@@ -1,9 +1,10 @@
 ---
 title: "Infinite Queries"
-description: "Guide for Infinite Queries in SwrSharp"
+description: "Building infinite scroll"
 order: 14
 category: "Guides"
 ---
+
 # Infinite Queries
 
 Rendering lists that can additively "load more" data onto an existing set of data or "infinite scroll" is a very common UI pattern. SwrSharp supports infinite queries through the `UseInfiniteQuery` class for querying these types of lists.
@@ -449,21 +450,3 @@ if (query.IsFetching)
 if (query.IsFetching)
     return "Loading..."; // Can't distinguish states
 ```
-
----
-
-## Summary
-
-- ✅ `UseInfiniteQuery<TData, TPageParam>` for infinite scroll
-- ✅ `InitialPageParam` required
-- ✅ `GetNextPageParam` returns next cursor or null
-- ✅ `FetchNextPageAsync()` loads more data
-- ✅ `HasNextPage` indicates more data available
-- ✅ `IsFetchingNextPage` for loading state
-- ✅ Check `!IsFetching` before fetching
-- ✅ Sequential refetch for consistency
-- ✅ `MaxPages` limits memory usage
-- ✅ Bi-directional with `GetPreviousPageParam`
-
-**Perfect for**: Load more buttons, infinite scroll, chat messages, social media feeds! 🚀
-

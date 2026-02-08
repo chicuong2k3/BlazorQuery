@@ -1,0 +1,50 @@
+@page "/debug/posts"
+@using BlazorStatic
+@using BlazorStatic.Services
+@inject BlazorStaticContentService<DocFrontMatter> ContentService
+<div class="p-8 bg-gray-900 text-white min-h-screen">
+    <h1 class="text-3xl font-bold mb-6">Debug: All Posts</h1>
+    <div class="mb-4">
+        <p class="text-gray-400">Total posts: @ContentService.Posts.Count</p>
+    </div>
+    @if (ContentService.Posts.Count == 0)
+    {
+        <div class="bg-red-900/20 border border-red-500 rounded p-4">
+            <p class="text-red-400 font-bold">⚠️ No posts found!</p>
+            <p class="text-sm text-gray-400 mt-2">ContentService has 0 posts. Check:</p>
+            <ul class="list-disc ml-6 mt-2 text-sm text-gray-400">
+                <li>Content/Docs directory exists</li>
+                <li>Markdown files have proper front matter</li>
+                <li>BlazorStatic service is configured</li>
+            </ul>
+        </div>
+    }
+    else
+    {
+        <div class="space-y-4">
+            @foreach (var post in ContentService.Posts)
+            {
+                <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2">@post.FrontMatter.Title</h3>
+                            <p class="text-sm text-gray-400 mb-2">@post.FrontMatter.Description</p>
+                            <div class="flex gap-4 text-xs text-gray-500">
+                                <span>Category: @post.FrontMatter.Category</span>
+                                <span>Order: @post.FrontMatter.Order</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-700">
+                        <p class="text-sm text-green-400 font-mono">URL: @post.Url</p>
+                        <a href="@post.Url" class="text-blue-400 hover:text-blue-300 text-sm mt-1 inline-block">
+                            → Visit page
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+@code {
+}

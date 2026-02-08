@@ -1,3 +1,10 @@
+---
+title: "Parallel Queries"
+description: "Fetching multiple queries"
+order: 6
+category: "Guides"
+---
+
 # Parallel Queries
 
 "Parallel" queries are queries that are executed in parallel, or at the same time, to maximize fetching concurrency.
@@ -377,14 +384,3 @@ await userQueries.ExecuteAllAsync();
 - SwrSharp requires explicit `ExecuteAllAsync()` call
 - SwrSharp uses class instances instead of hooks
 - Type parameter `<T>` is required in C#
-
----
-
-## Summary
-
-- ✅ **Manual Parallel**: Use multiple `UseQuery` instances with `Task.WhenAll`
-- ✅ **Dynamic Parallel**: Use `UseQueries<T>` for variable number of queries
-- ✅ **Mixed Types**: Use non-generic `UseQueries` (less type-safe)
-- ✅ **Events**: Subscribe to `OnChange` for reactivity
-- ✅ **Lifecycle**: Remember to `Dispose()` when done
-

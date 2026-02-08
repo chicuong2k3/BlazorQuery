@@ -1,9 +1,10 @@
 ---
 title: "Installation"
-description: "How to install and setup SwrSharp in your Blazor project"
+description: "How to install and setup SwrSharp"
 order: 2
 category: "Getting Started"
 ---
+
 
 # Installation
 
@@ -97,4 +98,3 @@ Create a simple test page to verify everything is working:
 - Read [Query Basics](/docs/guides/query-basics)
 - Learn [Query Keys](/docs/guides/query-keys)
 - Explore [API Reference](/docs/api/query-client)
-

@@ -4,69 +4,97 @@
 @page "/docs/guides/{**route}"
 @page "/docs/concepts/{**route}"
 @page "/docs/api/{**route}"
-@using BlazorStatic
 @using BlazorStatic.Services
 @inject BlazorStaticContentService<DocFrontMatter> ContentService
 
-<article class="ml-64 max-w-4xl mx-auto px-8 py-12">
+<!-- Header Bar -->
+<div class="border-b border-[#21262d] bg-[#0d1117] sticky top-0 lg:top-0 z-10">
+    <div class="px-4 sm:px-8 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-6">
+            <span class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">@(Post?.FrontMatter.Category ?? "Documentation")</span>
+        </div>
+        <div class="hidden sm:flex items-center space-x-3">
+            <button id="copy-page-btn"
+                    class="px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-[#21262d] rounded hover:border-[#30363d] transition font-medium">
+                Copy page
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<article class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
     @if (Post == null)
     {
-        <div class="text-center py-12">
-            <h1 class="text-2xl font-bold text-white">Page not found</h1>
-            <p class="text-gray-400 mt-2">The documentation page you're looking for doesn't exist.</p>
-            <a href="/docs/getting-started/overview" class="text-red-400 hover:text-red-300 mt-4 inline-block">
+        <div class="text-center py-16 sm:py-20">
+            <h1 class="text-xl sm:text-2xl font-bold text-white mb-3">Page not found</h1>
+            <p class="text-gray-400 mb-6 text-sm sm:text-base">The documentation page you're looking for doesn't exist.</p>
+            <a href="/docs/getting-started/overview" class="text-red-400 hover:text-red-300 text-sm font-medium">
                 ← Back to Overview
             </a>
         </div>
     }
     else
     {
-        <div class="mb-8">
-            <p class="text-xs text-gray-500 mb-3 uppercase tracking-wider">@Post.FrontMatter.Category</p>
-            <h1 class="text-5xl font-bold text-white mb-4 leading-tight">@Post.FrontMatter.Title</h1>
+        <!-- Category + Title -->
+        <div class="mb-8 sm:mb-10">
+            <p class="text-[10px] text-gray-500 mb-3 sm:mb-4 uppercase tracking-wider font-semibold">@Post.FrontMatter.Category</p>
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">@Post.FrontMatter.Title</h1>
         </div>
 
-        <div class="prose prose-invert prose-lg max-w-none 
-                    prose-headings:text-white prose-headings:font-bold 
-                    prose-h1:text-4xl prose-h1:mb-6 prose-h1:mt-12
-                    prose-h2:text-3xl prose-h2:mb-4 prose-h2:mt-10
-                    prose-h3:text-2xl prose-h3:mb-3 prose-h3:mt-8
-                    prose-p:text-gray-300 prose-p:leading-relaxed prose-p:mb-4
-                    prose-a:text-red-400 prose-a:no-underline hover:prose-a:text-red-300 hover:prose-a:underline
+        <!-- Content with prose styling -->
+        <div class="prose prose-invert prose-sm sm:prose-base max-w-none
+                    prose-headings:font-bold prose-headings:text-white
+                    prose-h1:text-2xl prose-h1:sm:text-3xl prose-h1:mt-10 prose-h1:sm:mt-12 prose-h1:mb-4 prose-h1:sm:mb-6
+                    prose-h2:text-xl prose-h2:sm:text-2xl prose-h2:mt-8 prose-h2:sm:mt-10 prose-h2:mb-3 prose-h2:sm:mb-4 prose-h2:border-b prose-h2:border-gray-800 prose-h2:pb-3
+                    prose-h3:text-lg prose-h3:sm:text-xl prose-h3:mt-6 prose-h3:sm:mt-8 prose-h3:mb-2 prose-h3:sm:mb-3
+                    prose-h4:text-base prose-h4:sm:text-lg prose-h4:mt-5 prose-h4:sm:mt-6 prose-h4:mb-2
+                    prose-p:text-gray-300 prose-p:leading-relaxed prose-p:text-sm prose-p:mb-4
+                    prose-a:text-red-400 prose-a:no-underline prose-a:font-medium hover:prose-a:underline hover:prose-a:text-red-300
                     prose-strong:text-white prose-strong:font-semibold
-                    prose-code:text-red-300 prose-code:bg-gray-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-                    prose-pre:bg-black/30 prose-pre:border prose-pre:border-gray-800 prose-pre:rounded-lg
-                    prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:bg-blue-500/10 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r
-                    prose-ul:text-gray-300 prose-ol:text-gray-300
-                    prose-li:my-1">
+                    prose-code:text-[#ff6b6b] prose-code:bg-gray-800/60 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[13px] prose-code:font-mono prose-code:before:content-[''] prose-code:after:content-['']
+                    prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-gray-800 prose-pre:rounded-lg prose-pre:text-[13px]
+                    prose-pre:shadow-lg prose-pre:p-3 prose-pre:sm:p-4 prose-pre:overflow-x-auto
+                    prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:bg-blue-500/5
+                    prose-blockquote:py-3 prose-blockquote:px-4 prose-blockquote:sm:px-5 prose-blockquote:rounded-r prose-blockquote:not-italic
+                    prose-blockquote:text-gray-300
+                    prose-ul:text-gray-300 prose-ul:my-4
+                    prose-ol:text-gray-300 prose-ol:my-4
+                    prose-li:my-1 prose-li:text-sm
+                    prose-table:text-gray-300 prose-table:text-sm
+                    prose-th:border-gray-700 prose-th:bg-gray-800/50
+                    prose-td:border-gray-700
+                    prose-hr:border-gray-800 prose-hr:my-6 prose-hr:sm:my-8
+                    prose-img:rounded-lg prose-img:shadow-xl prose-img:max-w-full prose-img:h-auto">
             @((MarkupString)Post.HtmlContent)
         </div>
 
-        <div class="mt-16 pt-8 border-t border-gray-800">
-            <div class="flex justify-between items-center">
+        <!-- Previous/Next Navigation -->
+        <div class="mt-12 sm:mt-20 pt-8 sm:pt-10 border-t border-gray-800">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 @if (PreviousPost != null)
                 {
-                    <a href="@PreviousPost.Url" class="group flex items-center text-gray-400 hover:text-white transition">
-                        <span class="text-2xl mr-2 group-hover:-translate-x-1 transition-transform">←</span>
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Previous</div>
-                            <div class="font-medium">@PreviousPost.FrontMatter.Title</div>
+                    <a href="@GetPostUrl(PreviousPost)" class="group border border-gray-800 rounded-lg p-4 sm:p-5 hover:border-gray-700 hover:bg-gray-900/30 transition">
+                        <div class="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+                            <span>←</span>
+                            <span>Previous</span>
                         </div>
+                        <div class="text-white font-medium group-hover:text-red-400 transition text-sm sm:text-base">@PreviousPost.FrontMatter.Title</div>
                     </a>
                 }
                 else
                 {
-                    <div></div>
+                    <div class="hidden sm:block"></div>
                 }
 
                 @if (NextPost != null)
                 {
-                    <a href="@NextPost.Url" class="group flex items-center text-gray-400 hover:text-white transition text-right">
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Next</div>
-                            <div class="font-medium">@NextPost.FrontMatter.Title</div>
+                    <a href="@GetPostUrl(NextPost)" class="group border border-gray-800 rounded-lg p-4 sm:p-5 hover:border-gray-700 hover:bg-gray-900/30 transition text-right">
+                        <div class="flex items-center justify-end gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+                            <span>Next</span>
+                            <span>→</span>
                         </div>
-                        <span class="text-2xl ml-2 group-hover:translate-x-1 transition-transform">→</span>
+                        <div class="text-white font-medium group-hover:text-red-400 transition text-sm sm:text-base">@NextPost.FrontMatter.Title</div>
                     </a>
                 }
             </div>
@@ -84,24 +112,75 @@
 
     protected override void OnInitialized()
     {
-        // Build the URL based on the route
-        var url = $"/docs/{Route}";
-        
-        // Find the post
-        Post = ContentService.Posts.FirstOrDefault(p => p.Url.EndsWith(url));
+        Console.WriteLine($"Total posts: {ContentService.Posts.Count}");
+        Console.WriteLine($"Looking for route: {Route}");
+
+        // 1. Try exact match with /docs/ prefix
+        var targetUrl = $"/docs/{Route}";
+        Post = ContentService.Posts.FirstOrDefault(p =>
+            p.Url.Equals(targetUrl, StringComparison.OrdinalIgnoreCase) ||
+            p.Url.Equals(Route, StringComparison.OrdinalIgnoreCase));
+
+        // 2. Try normalized match (handles PascalCase dirs + number prefixes)
+        if (Post == null)
+        {
+            var normalizedRoute = NormalizeSlug(Route);
+            Post = ContentService.Posts.FirstOrDefault(p =>
+                NormalizeSlug(p.Url) == normalizedRoute ||
+                NormalizeSlug(p.Url) == NormalizeSlug(targetUrl));
+        }
+
+        // 3. Try partial match on last segment only
+        if (Post == null)
+        {
+            var lastSegment = Route.Contains('/') ? Route.Split('/').Last() : Route;
+            var normalizedSegment = NormalizeSlug(lastSegment);
+            Post = ContentService.Posts.FirstOrDefault(p =>
+            {
+                var postLastSegment = p.Url.Split('/').Last();
+                return NormalizeSlug(postLastSegment) == normalizedSegment;
+            });
+        }
+
+        Console.WriteLine(Post == null ? $"Post not found for route: '{Route}'" : $"Found post: '{Post.Url}' for route: '{Route}'");
 
         if (Post != null)
         {
-            var index = ContentService.Posts.IndexOf(Post);
+            var postDir = Post.Url.Contains('/') ? Post.Url.Split('/')[0] : "";
+            var sameCategoryPosts = ContentService.Posts
+                .Where(p => p.Url.StartsWith(postDir + "/", StringComparison.OrdinalIgnoreCase)
+                         || (!p.Url.Contains('/') && !Post.Url.Contains('/')))
+                .OrderBy(p => p.FrontMatter.Order)
+                .ThenBy(p => p.Url)
+                .ToList();
+
+            var index = sameCategoryPosts.IndexOf(Post);
             if (index > 0)
-            {
-                PreviousPost = ContentService.Posts[index - 1];
-            }
-            if (index < ContentService.Posts.Count - 1)
-            {
-                NextPost = ContentService.Posts[index + 1];
-            }
+                PreviousPost = sameCategoryPosts[index - 1];
+            if (index >= 0 && index < sameCategoryPosts.Count - 1)
+                NextPost = sameCategoryPosts[index + 1];
         }
     }
-}
 
+    private static string GetPostUrl(Post<DocFrontMatter> post)
+    {
+        return "/docs/" + NormalizeSlug(post.Url);
+    }
+
+    private static string NormalizeSlug(string url)
+    {
+        var segments = url.Trim('/').Split('/');
+
+        var normalized = segments.Select(segment =>
+        {
+            segment = System.Text.RegularExpressions.Regex.Replace(segment, @"^\d+-", "");
+            segment = System.Text.RegularExpressions.Regex.Replace(segment, "([a-z])([A-Z])", "$1-$2");
+            segment = System.Text.RegularExpressions.Regex.Replace(segment, "([A-Z]+)([A-Z][a-z])", "$1-$2");
+            segment = segment.ToLowerInvariant();
+            segment = System.Text.RegularExpressions.Regex.Replace(segment, @"-+", "-").Trim('-');
+            return segment;
+        });
+
+        return string.Join("/", normalized);
+    }
+}

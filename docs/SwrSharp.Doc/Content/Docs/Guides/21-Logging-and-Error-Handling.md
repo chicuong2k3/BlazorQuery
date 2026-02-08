@@ -1,9 +1,10 @@
 ---
 title: "Logging and Error Handling"
-description: "Guide for Logging and Error Handling in SwrSharp"
+description: "Logging best practices"
 order: 21
 category: "Guides"
 ---
+
 # Logging and Error Handling
 Proper logging and error handling are crucial for debugging and maintaining production applications.
 ## Error Handling

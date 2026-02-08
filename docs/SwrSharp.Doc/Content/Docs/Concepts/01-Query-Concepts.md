@@ -1,9 +1,10 @@
 ---
 title: "Query Concepts"
-description: "Core concepts behind SwrSharp queries"
+description: "Core concepts of SwrSharp"
 order: 1
 category: "Concepts"
 ---
+
 
 # Query Concepts
 
@@ -99,4 +100,3 @@ UseQuery(new QueryKey("todos", userId), FetchUserTodos);
 - **Invalid**: Data is explicitly marked for refetch
 
 Stale queries refetch in the background on certain triggers. Invalid queries refetch immediately.
-

@@ -1,9 +1,10 @@
 ---
 title: "Security Best Practices"
-description: "Guide for Security Best Practices in SwrSharp"
+description: "Security guidelines"
 order: 22
 category: "Guides"
 ---
+
 # Security Best Practices
 Security is critical when working with data fetching and caching. Follow these best practices to keep your SwrSharp applications secure.
 ## Authentication & Authorization

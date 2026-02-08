@@ -1,3 +1,10 @@
+---
+title: "Query Retries"
+description: "Configuring retry behavior"
+order: 4
+category: "Guides"
+---
+
 
 
 # Query Retries in SwrSharp
