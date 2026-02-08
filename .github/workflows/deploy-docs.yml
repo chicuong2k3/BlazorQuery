@@ -30,12 +30,17 @@ jobs:
         run: dotnet build --configuration Release --no-restore
         working-directory: ./docs/SwrSharp.Doc
       - name: Publish
-        run: dotnet publish --configuration Release --no-build --output publish
+        run: |
+          dotnet publish --configuration Release --no-build --output publish
+          echo "=== Copying Content to publish directory ==="
+          cp -r Content publish/
+          ls -la publish/
         working-directory: ./docs/SwrSharp.Doc
       - name: Generate static site
         run: |
           cd publish
-          dotnet SwrSharp.Doc.dll
+          echo "=== Starting BlazorStatic generator ==="
+          timeout 120s dotnet SwrSharp.Doc.dll || echo "Generator completed or timed out"
         working-directory: ./docs/SwrSharp.Doc
         env:
           ASPNETCORE_ENVIRONMENT: Production
@@ -46,8 +51,11 @@ jobs:
           if [ -d "./docs/SwrSharp.Doc/output" ]; then
             echo "=== Output directory found ==="
             ls -la ./docs/SwrSharp.Doc/output | head -20
+            echo "Total files: $(find ./docs/SwrSharp.Doc/output -type f | wc -l)"
           else
             echo "=== Output directory NOT found ==="
+            echo "Checking publish directory..."
+            ls -la ./docs/SwrSharp.Doc/publish/
           fi
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

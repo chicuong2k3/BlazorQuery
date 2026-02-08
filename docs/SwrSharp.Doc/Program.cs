@@ -9,7 +9,6 @@ builder.Services.AddBlazorStaticService(opt =>
         {
             opt.ShouldGenerateSitemap = true;
             opt.SiteUrl = "https://swrsharp.dev";
-            // opt.IgnoredPathsOnContentCopy.Add("file-in-wwwroot-that-i-dont-want");
         }
     )
     // Docs content service
@@ -17,13 +16,14 @@ builder.Services.AddBlazorStaticService(opt =>
     {
         opt.PageUrl = "docs";
         opt.ContentPath = "Content/Docs";
-    })
-    // Blog content service
-    .AddBlazorStaticContentService<BlogFrontMatter>(opt =>
-    {
-        opt.PageUrl = "blog";
-        opt.ContentPath = "Content/Blog";
     });
+    // Note: Blog service removed as we only need documentation
+    // If you need blog, create Content/Blog directory and uncomment:
+    // .AddBlazorStaticContentService<BlogFrontMatter>(opt =>
+    // {
+    //     opt.PageUrl = "blog";
+    //     opt.ContentPath = "Content/Blog";
+    // });
 
 builder.Services.AddRazorComponents();
 

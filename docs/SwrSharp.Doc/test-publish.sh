@@ -5,6 +5,7 @@ echo "======================================"
 echo ""
 cd "$(dirname "$0")"
 echo "1. Cleaning previous builds..."
+rm -rf publish output
 dotnet clean > /dev/null 2>&1
 echo "2. Restoring dependencies..."
 dotnet restore
@@ -16,16 +17,20 @@ if [ $? -ne 0 ]; then
 fi
 echo "4. Publishing..."
 dotnet publish --configuration Release --no-build --output publish
-echo "5. Running static site generator..."
+echo "5. Copying Content to publish directory..."
+cp -r Content publish/
+echo "   Content directory copied"
+ls -la publish/Content/ | head -10
+echo "6. Running static site generator..."
 cd publish
-ASPNETCORE_ENVIRONMENT=Production dotnet SwrSharp.Doc.dll &
+ASPNETCORE_ENVIRONMENT=Production timeout 120s dotnet SwrSharp.Doc.dll &
 PID=$!
-echo "   Waiting for site generation (10 seconds)..."
-sleep 10
-kill $PID 2>/dev/null
+echo "   Waiting for site generation (up to 120 seconds)..."
+wait $PID
+RESULT=$?
 cd ..
 echo ""
-echo "6. Checking output..."
+echo "7. Checking output..."
 if [ -d "output" ]; then
     echo "✓ Output directory exists"
     echo ""
@@ -39,12 +44,16 @@ if [ -d "output" ]; then
         echo "✅ Static site generation SUCCESS!"
         echo ""
         echo "Output location: $(pwd)/output"
+        echo ""
+        echo "To preview locally, run:"
+        echo "  cd output && python3 -m http.server 8000"
     else
         echo "❌ No files generated!"
         exit 1
     fi
 else
     echo "❌ Output directory not found!"
+    echo "Generator may have failed. Check logs above."
     exit 1
 fi
 echo ""
