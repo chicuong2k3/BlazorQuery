@@ -2,17 +2,13 @@
 
 <div class="min-h-screen bg-[#0d1117]">
     <!-- Mobile Header Bar -->
-    <div class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-[#010409] border-b border-[#21262d] px-4 py-3 flex items-center gap-3">
-        <button @onclick="ToggleSidebar" class="text-gray-400 hover:text-white transition p-1">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                @if (_sidebarOpen)
-                {
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                }
-                else
-                {
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                }
+    <div class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#010409] border-b border-[#21262d] px-4 py-3 flex items-center gap-3">
+        <button id="mobile-menu-btn" onclick="toggleMobileSidebar()" class="text-gray-400 hover:text-white transition p-1">
+            <svg id="menu-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+            <svg id="menu-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
             </svg>
         </button>
         <div class="flex items-center gap-2">
@@ -23,13 +19,10 @@
     </div>
 
     <!-- Sidebar Overlay (mobile) -->
-    @if (_sidebarOpen)
-    {
-        <div class="lg:hidden fixed inset-0 z-20 bg-black/60" @onclick="ToggleSidebar"></div>
-    }
+    <div id="sidebar-overlay" onclick="closeMobileSidebar()" class="lg:hidden fixed inset-0 z-30 bg-black/60 hidden"></div>
 
     <!-- Sidebar Navigation -->
-    <DocsMenu IsOpen="_sidebarOpen" OnClose="CloseSidebar" />
+    <DocsMenu />
 
     <!-- Main Content Area -->
     <div class="lg:pl-64 pt-14 lg:pt-0 bg-[#0d1117]">
@@ -37,16 +30,55 @@
     </div>
 </div>
 
-@code {
-    private bool _sidebarOpen;
-
-    private void ToggleSidebar()
-    {
-        _sidebarOpen = !_sidebarOpen;
+<script>
+    // Mobile sidebar toggle - Pure JavaScript
+    function toggleMobileSidebar() {
+        var nav = document.querySelector('nav');
+        var overlay = document.getElementById('sidebar-overlay');
+        var iconOpen = document.getElementById('menu-icon-open');
+        var iconClose = document.getElementById('menu-icon-close');
+        
+        if (nav.classList.contains('-translate-x-full')) {
+            // Open sidebar
+            nav.classList.remove('-translate-x-full');
+            nav.classList.add('translate-x-0');
+            overlay.classList.remove('hidden');
+            iconOpen.classList.add('hidden');
+            iconClose.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        } else {
+            // Close sidebar
+            closeMobileSidebar();
+        }
     }
-
-    private void CloseSidebar()
-    {
-        _sidebarOpen = false;
+    
+    function closeMobileSidebar() {
+        var nav = document.querySelector('nav');
+        var overlay = document.getElementById('sidebar-overlay');
+        var iconOpen = document.getElementById('menu-icon-open');
+        var iconClose = document.getElementById('menu-icon-close');
+        
+        nav.classList.add('-translate-x-full');
+        nav.classList.remove('translate-x-0');
+        overlay.classList.add('hidden');
+        iconOpen.classList.remove('hidden');
+        iconClose.classList.add('hidden');
+        document.body.style.overflow = '';
     }
-}
+    
+    // Close sidebar when clicking a link on mobile
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth < 1024 && e.target.closest('nav a')) {
+            setTimeout(closeMobileSidebar, 100);
+        }
+    });
+    
+    // Close sidebar on window resize to desktop
+    window.addEventListener('resize', function() {
+        if (window.innerWidth >= 1024) {
+            var overlay = document.getElementById('sidebar-overlay');
+            if (overlay) overlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    });
+</script>
