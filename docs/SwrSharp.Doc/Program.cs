@@ -9,6 +9,7 @@ builder.Services.AddBlazorStaticService(opt =>
         {
             opt.ShouldGenerateSitemap = true;
             opt.SiteUrl = "https://swrsharp.dev";
+            opt.OutputFolderPath = "output"; // Explicitly set output folder
         }
     )
     // Docs content service
