@@ -32,69 +32,47 @@ jobs:
       - name: Publish
         run: |
           dotnet publish --configuration Release --no-build --output publish
-          echo "=== Copying Content to publish directory ==="
           cp -r Content publish/
-          echo "=== Content copied ==="
-          ls -la publish/Content/
         working-directory: ./docs/SwrSharp.Doc
       - name: Generate static site
         run: |
           cd publish
-          echo "=== Starting BlazorStatic generator ==="
-          echo "Working directory: $(pwd)"
           ASPNETCORE_ENVIRONMENT=Production timeout 180s dotnet SwrSharp.Doc.dll || true
-          echo "=== Generator completed ==="
         working-directory: ./docs/SwrSharp.Doc
-      - name: Find and prepare output
+      - name: Prepare output
         run: |
-          echo "=== Searching for output directory ==="
-          # Check multiple possible locations
-          if [ -d "./docs/SwrSharp.Doc/output" ]; then
-            echo "✓ Found output at: ./docs/SwrSharp.Doc/output"
-            OUTPUT_PATH="./docs/SwrSharp.Doc/output"
-          elif [ -d "./docs/SwrSharp.Doc/publish/output" ]; then
-            echo "✓ Found output at: ./docs/SwrSharp.Doc/publish/output"
+          # Find output directory
+          if [ -d "./docs/SwrSharp.Doc/publish/output" ]; then
             OUTPUT_PATH="./docs/SwrSharp.Doc/publish/output"
-          elif [ -d "./docs/SwrSharp.Doc/bin/Release/net10.0/output" ]; then
-            echo "✓ Found output at: ./docs/SwrSharp.Doc/bin/Release/net10.0/output"
-            OUTPUT_PATH="./docs/SwrSharp.Doc/bin/Release/net10.0/output"
-          else
-            echo "❌ Output directory not found in common locations"
-            echo "Searching entire docs directory..."
-            find ./docs/SwrSharp.Doc -name "output" -type d
-            echo ""
-            echo "Creating fallback output directory..."
-            mkdir -p ./docs/SwrSharp.Doc/output
-            echo "<html><body><h1>Error: Static site generation failed</h1></body></html>" > ./docs/SwrSharp.Doc/output/index.html
+          elif [ -d "./docs/SwrSharp.Doc/output" ]; then
             OUTPUT_PATH="./docs/SwrSharp.Doc/output"
+          else
+            echo "Output directory not found!"
+            find ./docs/SwrSharp.Doc -name "output" -type d
+            exit 1
           fi
-          # Add .nojekyll to prevent GitHub Pages from ignoring _framework
+          echo "Output at: ${OUTPUT_PATH}"
+
+          # Ensure wwwroot static files are in output (BlazorStatic may miss them in publish mode)
+          WWWROOT="./docs/SwrSharp.Doc/publish/wwwroot"
+          if [ -d "$WWWROOT" ]; then
+            echo "Copying wwwroot files to output..."
+            cp -rn "$WWWROOT"/* "${OUTPUT_PATH}/" 2>/dev/null || true
+          fi
+
+          # Add .nojekyll and 404 fallback
           touch ${OUTPUT_PATH}/.nojekyll
-          # Copy index.html as 404.html for SPA routing fallback
           if [ -f "${OUTPUT_PATH}/index.html" ]; then
             cp ${OUTPUT_PATH}/index.html ${OUTPUT_PATH}/404.html
           fi
+
           echo "OUTPUT_PATH=${OUTPUT_PATH}" >> $GITHUB_ENV
-          echo ""
           echo "=== Output contents ==="
-          ls -la ${OUTPUT_PATH} | head -30
+          ls -la ${OUTPUT_PATH}
           echo ""
-          FILE_COUNT=$(find ${OUTPUT_PATH} -type f | wc -l)
-          echo "Total files: ${FILE_COUNT}"
-      - name: Create kebab-case URL aliases
-        run: |
-          echo "=== Creating kebab-case aliases for PascalCase paths ==="
-          for file in $(find ${OUTPUT_PATH}/docs -name "*.html" -type f 2>/dev/null); do
-            noext="${file%.html}"
-            # Convert PascalCase to kebab-case and remove number prefixes
-            kebab=$(echo "$noext" | sed -E 's/([a-z])([A-Z])/\1-\2/g' | sed -E 's/([A-Z]+)([A-Z][a-z])/\1-\2/g' | tr '[:upper:]' '[:lower:]' | sed -E 's|/[0-9]+-|/|g')
-            if [ "$noext" != "$kebab" ]; then
-              mkdir -p "$kebab"
-              cp "$file" "$kebab/index.html"
-              echo "  $file -> $kebab/index.html"
-            fi
-          done
-          echo "=== Kebab-case aliases created ==="
+          echo "=== Docs pages ==="
+          find ${OUTPUT_PATH}/docs -name "*.html" 2>/dev/null | head -10
+          echo "Total files: $(find ${OUTPUT_PATH} -type f | wc -l)"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
