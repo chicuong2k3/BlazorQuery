@@ -8,7 +8,7 @@ builder.WebHost.UseStaticWebAssets();
 builder.Services.AddBlazorStaticService(opt =>
         {
             opt.ShouldGenerateSitemap = true;
-            opt.SiteUrl = "https://swrsharp.dev";
+            opt.SiteUrl = "https://chicuong2k3.github.io/BlazorQuery";
             opt.OutputFolderPath = "output"; // Explicitly set output folder
         }
     )
@@ -18,13 +18,6 @@ builder.Services.AddBlazorStaticService(opt =>
         opt.PageUrl = "docs";
         opt.ContentPath = "Content/Docs";
     });
-    // Note: Blog service removed as we only need documentation
-    // If you need blog, create Content/Blog directory and uncomment:
-    // .AddBlazorStaticContentService<BlogFrontMatter>(opt =>
-    // {
-    //     opt.PageUrl = "blog";
-    //     opt.ContentPath = "Content/Blog";
-    // });
 
 builder.Services.AddRazorComponents();
 
@@ -54,9 +47,6 @@ app.Run();
 
 public static class WebsiteKeys
 {
-    public const string GitHubRepo = "https://github.com/BlazorStatic/SwrSharp.Doc";
-    public const string X = "https://x.com/";
-    public const string Title = "BlazorStatic Minimal Blog";
-    public const string BlogPostStorageAddress = $"{GitHubRepo}/tree/main/Content/Blog";
-    public const string BlogLead = "Sample blog created with BlazorStatic and TailwindCSS";
+    public const string GitHubRepo = "https://github.com/chicuong2k3/BlazorQuery";
+    public const string Title = "SwrSharp Documentation";
 }

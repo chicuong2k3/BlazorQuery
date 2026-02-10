@@ -68,6 +68,12 @@ jobs:
             echo "<html><body><h1>Error: Static site generation failed</h1></body></html>" > ./docs/SwrSharp.Doc/output/index.html
             OUTPUT_PATH="./docs/SwrSharp.Doc/output"
           fi
+          # Add .nojekyll to prevent GitHub Pages from ignoring _framework
+          touch ${OUTPUT_PATH}/.nojekyll
+          # Copy index.html as 404.html for SPA routing fallback
+          if [ -f "${OUTPUT_PATH}/index.html" ]; then
+            cp ${OUTPUT_PATH}/index.html ${OUTPUT_PATH}/404.html
+          fi
           echo "OUTPUT_PATH=${OUTPUT_PATH}" >> $GITHUB_ENV
           echo ""
           echo "=== Output contents ==="

@@ -1,6 +1,12 @@
-# SwrSharp 🚀
+<p align="center">
+  <img src="swrsharp-logo.jpg" alt="SwrSharp" width="180" />
+</p>
 
-A powerful SWR (Stale-While-Revalidate) data fetching library for .NET, inspired by [Vercel SWR](https://swr.vercel.app/) and [TanStack Query](https://tanstack.com/query/latest).
+<h1 align="center">SwrSharp</h1>
+
+<p align="center">
+  A powerful SWR (Stale-While-Revalidate) data fetching library for .NET, inspired by <a href="https://swr.vercel.app/">Vercel SWR</a> and <a href="https://tanstack.com/query/latest">TanStack Query</a>.
+</p>
 
 **SwrSharp.Core** is the platform-agnostic core library. Future packages will include:
 - `SwrSharp.Blazor` - Blazor Server/WASM integration
