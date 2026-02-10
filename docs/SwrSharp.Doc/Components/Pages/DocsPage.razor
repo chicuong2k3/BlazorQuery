@@ -6,6 +6,7 @@
 @page "/docs/API/{**route}"
 @using BlazorStatic.Services
 @inject BlazorStaticContentService<DocFrontMatter> ContentService
+@inject NavigationManager NavigationManager
 
 <!-- Header Bar -->
 <div class="border-b border-gray-200 dark:border-[#21262d] bg-white dark:bg-[#0d1117] sticky top-0 lg:top-0 z-10">
@@ -29,7 +30,7 @@
         <div class="text-center py-16 sm:py-20">
             <h1 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">Page not found</h1>
             <p class="text-gray-500 dark:text-gray-400 mb-6 text-sm sm:text-base">The documentation page you're looking for doesn't exist.</p>
-            <a href="docs/GettingStarted/overview" class="text-red-500 dark:text-red-400 hover:text-red-400 dark:hover:text-red-300 text-sm font-medium">
+            <a href="docs/GettingStarted/Overview" class="text-red-500 dark:text-red-400 hover:text-red-400 dark:hover:text-red-300 text-sm font-medium">
                 &#8592; Back to Overview
             </a>
         </div>
@@ -111,37 +112,57 @@
 
     protected override void OnInitialized()
     {
-        Console.WriteLine($"Total posts: {ContentService.Posts.Count}");
-        Console.WriteLine($"Looking for route: {Route}");
-
-        // 1. Try exact match with /docs/ prefix
-        var targetUrl = $"/docs/{Route}";
-        Post = ContentService.Posts.FirstOrDefault(p =>
-            p.Url.Equals(targetUrl, StringComparison.OrdinalIgnoreCase) ||
-            p.Url.Equals(Route, StringComparison.OrdinalIgnoreCase));
-
-        // 2. Try normalized match (handles PascalCase dirs + number prefixes)
-        if (Post == null)
+        // Get the full relative path from the URL (e.g., "GettingStarted/Overview")
+        var uri = new Uri(NavigationManager.Uri);
+        var fullPath = uri.AbsolutePath.TrimStart('/');
+        
+        // Remove base path if present (e.g., "BlazorQuery/")
+        var basePath = NavigationManager.BaseUri;
+        var baseUri = new Uri(basePath);
+        if (!string.IsNullOrEmpty(baseUri.AbsolutePath) && baseUri.AbsolutePath != "/")
         {
-            var normalizedRoute = NormalizeSlug(Route);
-            Post = ContentService.Posts.FirstOrDefault(p =>
-                NormalizeSlug(p.Url) == normalizedRoute ||
-                NormalizeSlug(p.Url) == NormalizeSlug(targetUrl));
-        }
-
-        // 3. Try partial match on last segment only
-        if (Post == null)
-        {
-            var lastSegment = Route.Contains('/') ? Route.Split('/').Last() : Route;
-            var normalizedSegment = NormalizeSlug(lastSegment);
-            Post = ContentService.Posts.FirstOrDefault(p =>
+            var basePathSegment = baseUri.AbsolutePath.Trim('/');
+            if (fullPath.StartsWith(basePathSegment + "/", StringComparison.OrdinalIgnoreCase))
             {
-                var postLastSegment = p.Url.Split('/').Last();
-                return NormalizeSlug(postLastSegment) == normalizedSegment;
-            });
+                fullPath = fullPath.Substring(basePathSegment.Length + 1);
+            }
+        }
+        
+        // Remove "docs/" prefix to get the content path
+        var contentPath = fullPath;
+        if (contentPath.StartsWith("docs/", StringComparison.OrdinalIgnoreCase))
+        {
+            contentPath = contentPath.Substring(5);
+        }
+        
+        Console.WriteLine($"Total posts: {ContentService.Posts.Count}");
+        Console.WriteLine($"Looking for contentPath: {contentPath}");
+        foreach (var p in ContentService.Posts.Take(5))
+        {
+            Console.WriteLine($"  Post URL: {p.Url}");
         }
 
-        Console.WriteLine(Post == null ? $"Post not found for route: '{Route}'" : $"Found post: '{Post.Url}' for route: '{Route}'");
+        // 1. Try exact match
+        Post = ContentService.Posts.FirstOrDefault(p =>
+            p.Url.Equals(contentPath, StringComparison.OrdinalIgnoreCase));
+
+        // 2. Try match without .html extension
+        if (Post == null && contentPath.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+        {
+            var withoutExt = contentPath.Substring(0, contentPath.Length - 5);
+            Post = ContentService.Posts.FirstOrDefault(p =>
+                p.Url.Equals(withoutExt, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // 3. Try case-insensitive partial match
+        if (Post == null)
+        {
+            Post = ContentService.Posts.FirstOrDefault(p =>
+                p.Url.EndsWith("/" + Route, StringComparison.OrdinalIgnoreCase) ||
+                p.Url.Equals(Route, StringComparison.OrdinalIgnoreCase));
+        }
+
+        Console.WriteLine(Post == null ? $"Post not found for: '{contentPath}'" : $"Found post: '{Post.Url}'");
 
         if (Post != null)
         {
@@ -163,23 +184,7 @@
 
     private static string GetPostUrl(Post<DocFrontMatter> post)
     {
-        return "docs/" + NormalizeSlug(post.Url);
-    }
-
-    private static string NormalizeSlug(string url)
-    {
-        var segments = url.Trim('/').Split('/');
-
-        var normalized = segments.Select(segment =>
-        {
-            segment = System.Text.RegularExpressions.Regex.Replace(segment, @"^\d+-", "");
-            segment = System.Text.RegularExpressions.Regex.Replace(segment, "([a-z])([A-Z])", "$1-$2");
-            segment = System.Text.RegularExpressions.Regex.Replace(segment, "([A-Z]+)([A-Z][a-z])", "$1-$2");
-            segment = segment.ToLowerInvariant();
-            segment = System.Text.RegularExpressions.Regex.Replace(segment, @"-+", "-").Trim('-');
-            return segment;
-        });
-
-        return string.Join("/", normalized);
+        // Use URL directly - BlazorStatic generates URLs matching file structure
+        return "docs/" + post.Url;
     }
 }
