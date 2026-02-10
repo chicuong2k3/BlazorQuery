@@ -22,7 +22,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
       - name: Restore dependencies
         run: dotnet restore
         working-directory: ./docs/SwrSharp.Doc
@@ -81,6 +81,20 @@ jobs:
           echo ""
           FILE_COUNT=$(find ${OUTPUT_PATH} -type f | wc -l)
           echo "Total files: ${FILE_COUNT}"
+      - name: Create kebab-case URL aliases
+        run: |
+          echo "=== Creating kebab-case aliases for PascalCase paths ==="
+          for file in $(find ${OUTPUT_PATH}/docs -name "*.html" -type f 2>/dev/null); do
+            noext="${file%.html}"
+            # Convert PascalCase to kebab-case and remove number prefixes
+            kebab=$(echo "$noext" | sed -E 's/([a-z])([A-Z])/\1-\2/g' | sed -E 's/([A-Z]+)([A-Z][a-z])/\1-\2/g' | tr '[:upper:]' '[:lower:]' | sed -E 's|/[0-9]+-|/|g')
+            if [ "$noext" != "$kebab" ]; then
+              mkdir -p "$kebab"
+              cp "$file" "$kebab/index.html"
+              echo "  $file -> $kebab/index.html"
+            fi
+          done
+          echo "=== Kebab-case aliases created ==="
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
