@@ -1,9 +1,6 @@
 @layout MainLayout
 
-@page "/docs/GettingStarted/{**route}"
-@page "/docs/Guides/{**route}"
-@page "/docs/Concepts/{**route}"
-@page "/docs/API/{**route}"
+@page "/docs/{**path}"
 @using BlazorStatic.Services
 @inject BlazorStaticContentService<DocFrontMatter> ContentService
 
@@ -103,7 +100,7 @@
 
 @code {
     [Parameter]
-    public string Route { get; set; } = "";
+    public string? Path { get; set; }
 
     private Post<DocFrontMatter>? Post { get; set; }
     private Post<DocFrontMatter>? PreviousPost { get; set; }
@@ -111,37 +108,19 @@
 
     protected override void OnInitialized()
     {
-        Console.WriteLine($"Total posts: {ContentService.Posts.Count}");
-        Console.WriteLine($"Looking for route: {Route}");
+        var contentPath = Path ?? "";
 
-        // 1. Try exact match with /docs/ prefix
-        var targetUrl = $"/docs/{Route}";
+        // 1. Try exact match (PascalCase URLs like "GettingStarted/Overview")
         Post = ContentService.Posts.FirstOrDefault(p =>
-            p.Url.Equals(targetUrl, StringComparison.OrdinalIgnoreCase) ||
-            p.Url.Equals(Route, StringComparison.OrdinalIgnoreCase));
+            p.Url.Equals(contentPath, StringComparison.OrdinalIgnoreCase));
 
-        // 2. Try normalized match (handles PascalCase dirs + number prefixes)
+        // 2. Try normalized match (kebab-case URLs like "getting-started/overview")
         if (Post == null)
         {
-            var normalizedRoute = NormalizeSlug(Route);
+            var normalizedPath = NormalizeSlug(contentPath);
             Post = ContentService.Posts.FirstOrDefault(p =>
-                NormalizeSlug(p.Url) == normalizedRoute ||
-                NormalizeSlug(p.Url) == NormalizeSlug(targetUrl));
+                NormalizeSlug(p.Url) == normalizedPath);
         }
-
-        // 3. Try partial match on last segment only
-        if (Post == null)
-        {
-            var lastSegment = Route.Contains('/') ? Route.Split('/').Last() : Route;
-            var normalizedSegment = NormalizeSlug(lastSegment);
-            Post = ContentService.Posts.FirstOrDefault(p =>
-            {
-                var postLastSegment = p.Url.Split('/').Last();
-                return NormalizeSlug(postLastSegment) == normalizedSegment;
-            });
-        }
-
-        Console.WriteLine(Post == null ? $"Post not found for route: '{Route}'" : $"Found post: '{Post.Url}' for route: '{Route}'");
 
         if (Post != null)
         {
@@ -163,13 +142,12 @@
 
     private static string GetPostUrl(Post<DocFrontMatter> post)
     {
-        return "docs/" + NormalizeSlug(post.Url);
+        return "docs/" + post.Url;
     }
 
     private static string NormalizeSlug(string url)
     {
         var segments = url.Trim('/').Split('/');
-
         var normalized = segments.Select(segment =>
         {
             segment = System.Text.RegularExpressions.Regex.Replace(segment, @"^\d+-", "");
@@ -179,7 +157,6 @@
             segment = System.Text.RegularExpressions.Regex.Replace(segment, @"-+", "-").Trim('-');
             return segment;
         });
-
         return string.Join("/", normalized);
     }
 }
