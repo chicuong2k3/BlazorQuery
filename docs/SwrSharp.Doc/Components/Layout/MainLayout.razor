@@ -12,7 +12,7 @@
             </svg>
         </button>
         <div class="flex items-center gap-2">
-            <img src="swrsharp-logo.jpg" alt="SwrSharp" class="w-6 h-6 rounded" />
+            <img src="/swrsharp-logo.jpg" alt="SwrSharp" class="w-6 h-6 rounded" />
             <span class="text-sm font-bold text-gray-900 dark:text-white">SWRSHARP</span>
             <span class="text-[10px] text-gray-500">v1.0</span>
         </div>
@@ -65,17 +65,19 @@
 <script>
     // Mobile sidebar toggle
     function toggleMobileSidebar() {
-        var nav = document.querySelector('nav');
+        var nav = document.getElementById('docs-sidebar');
         var overlay = document.getElementById('sidebar-overlay');
         var iconOpen = document.getElementById('menu-icon-open');
         var iconClose = document.getElementById('menu-icon-close');
 
+        if (!nav) return;
+
         if (nav.classList.contains('-translate-x-full')) {
             nav.classList.remove('-translate-x-full');
             nav.classList.add('translate-x-0');
-            overlay.classList.remove('hidden');
-            iconOpen.classList.add('hidden');
-            iconClose.classList.remove('hidden');
+            if (overlay) overlay.classList.remove('hidden');
+            if (iconOpen) iconOpen.classList.add('hidden');
+            if (iconClose) iconClose.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         } else {
             closeMobileSidebar();
@@ -83,21 +85,27 @@
     }
 
     function closeMobileSidebar() {
-        var nav = document.querySelector('nav');
+        var nav = document.getElementById('docs-sidebar');
         var overlay = document.getElementById('sidebar-overlay');
         var iconOpen = document.getElementById('menu-icon-open');
         var iconClose = document.getElementById('menu-icon-close');
 
+        if (!nav) return;
+
         nav.classList.add('-translate-x-full');
         nav.classList.remove('translate-x-0');
-        overlay.classList.add('hidden');
-        iconOpen.classList.remove('hidden');
-        iconClose.classList.add('hidden');
+        if (overlay) overlay.classList.add('hidden');
+        if (iconOpen) iconOpen.classList.remove('hidden');
+        if (iconClose) iconClose.classList.add('hidden');
         document.body.style.overflow = '';
     }
 
+    // Expose globally
+    window.toggleMobileSidebar = toggleMobileSidebar;
+    window.closeMobileSidebar = closeMobileSidebar;
+
     document.addEventListener('click', function(e) {
-        if (window.innerWidth < 1024 && e.target.closest('nav a')) {
+        if (window.innerWidth < 1024 && e.target.closest('#docs-sidebar a')) {
             setTimeout(closeMobileSidebar, 100);
         }
     });
