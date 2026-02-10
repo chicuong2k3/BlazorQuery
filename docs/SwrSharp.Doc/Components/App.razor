@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <base href="/BlazorQuery/"/>
+    <base href="@BaseHref"/>
     <title>SwrSharp - .NET Data Fetching & Caching</title>
 
     <!-- Theme init (before render to prevent FOUC) -->
@@ -585,3 +585,8 @@
 </body>
 
 </html>
+
+@code {
+    [Inject] private IWebHostEnvironment Env { get; set; } = default!;
+    private string BaseHref => Env.IsDevelopment() ? "/" : "/BlazorQuery/";
+}
