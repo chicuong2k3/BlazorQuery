@@ -22,5 +22,9 @@
         <Watch Include="Content/**/*"/>
     </ItemGroup>
 
+    <!-- Build TailwindCSS before dotnet build -->
+    <Target Name="BuildTailwind" BeforeTargets="Build" Condition="Exists('node_modules')">
+        <Exec Command="npx tailwindcss -i Styles/input.css -o wwwroot/css/tailwind.css --minify" />
+    </Target>
 
 </Project>

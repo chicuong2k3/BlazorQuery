@@ -46,9 +46,9 @@ public class TodosComponent
         if (_todosQuery == null) return;
 
         // Temporarily enable and fetch
-        _todosQuery._queryOptions.Enabled = true;
+        _todosQuery.Options.Enabled = true;
         await _todosQuery.RefetchAsync();
-        _todosQuery._queryOptions.Enabled = false; // Optional: disable again
+        _todosQuery.Options.Enabled = false; // Optional: disable again
     }
 
     private void RenderUI()
@@ -186,7 +186,7 @@ public class UserDashboardComponent
         // Update query options
         if (_userDataQuery != null)
         {
-            _userDataQuery._queryOptions.Enabled = !string.IsNullOrEmpty(newUserId);
+            _userDataQuery.Options.Enabled = !string.IsNullOrEmpty(newUserId);
 
             if (!string.IsNullOrEmpty(newUserId))
             {
@@ -234,7 +234,7 @@ Console.WriteLine($"IsLoading: {query.IsLoading}");     // false
 Console.WriteLine($"IsPending: {query.IsPending}");     // true
 
 // Enable and execute
-query._queryOptions.Enabled = true;
+query.Options.Enabled = true;
 var fetchTask = query.ExecuteAsync();
 
 // Now fetching:
@@ -273,7 +273,7 @@ Console.WriteLine(query.Status);  // Success
 Console.WriteLine(query.Data);    // <cached data>
 
 // Now disable the query
-query._queryOptions.Enabled = false;
+query.Options.Enabled = false;
 
 // Query still has cached data
 Console.WriteLine(query.Status);  // Success (has cached data)
@@ -307,7 +307,7 @@ queryClient.Invalidate(new QueryKey("data"));
 await query.RefetchAsync(); // Returns immediately, no fetch
 
 // To manually fetch, you must enable first
-query._queryOptions.Enabled = true;
+query.Options.Enabled = true;
 await query.RefetchAsync(); // Now it fetches
 ```
 
@@ -355,8 +355,8 @@ public class DataFetcherComponent : IDisposable
         if (_itemsQuery == null) return;
 
         // Temporarily enable for manual fetch
-        var wasEnabled = _itemsQuery._queryOptions.Enabled;
-        _itemsQuery._queryOptions.Enabled = true;
+        var wasEnabled = _itemsQuery.Options.Enabled;
+        _itemsQuery.Options.Enabled = true;
 
         try
         {
@@ -365,7 +365,7 @@ public class DataFetcherComponent : IDisposable
         finally
         {
             // Restore previous state
-            _itemsQuery._queryOptions.Enabled = wasEnabled;
+            _itemsQuery.Options.Enabled = wasEnabled;
         }
     }
 
@@ -375,7 +375,7 @@ public class DataFetcherComponent : IDisposable
         
         if (_itemsQuery != null)
         {
-            _itemsQuery._queryOptions.Enabled = !_isManualMode;
+            _itemsQuery.Options.Enabled = !_isManualMode;
 
             // If switching to auto mode, fetch immediately
             if (!_isManualMode && _itemsQuery.Data == null)
@@ -472,7 +472,7 @@ if (query.IsLoading)
     return LoadingSpinner();
 }
 
-if (!query._queryOptions.Enabled && query.Data == null)
+if (!query.Options.Enabled && query.Data == null)
 {
     // Disabled and no data
     return PlaceholderMessage("Click to load data");
@@ -484,63 +484,6 @@ if (query.IsSuccess)
     return DataView(query.Data);
 }
 ```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-function Todos() {
-  const [filter, setFilter] = useState('')
-
-  const { data } = useQuery({
-    queryKey: ['todos', filter],
-    queryFn: () => fetchTodos(filter),
-    enabled: !!filter, // Disabled until filter is set
-  })
-
-  return (
-    <div>
-      <FiltersForm onApply={setFilter} />
-      {data && <TodosTable data={data} />}
-    </div>
-  )
-}
-```
-
-### SwrSharp (C#):
-```csharp
-public class TodosComponent
-{
-    private string _filter = string.Empty;
-    private UseQuery<List<Todo>>? _query;
-
-    public async Task OnApplyFilterAsync(string filter)
-    {
-        _filter = filter;
-
-        _query = new UseQuery<List<Todo>>(
-            new QueryOptions<List<Todo>>(
-                queryKey: new("todos", _filter),
-                queryFn: async ctx => await FetchTodosAsync(_filter),
-                enabled: !string.IsNullOrEmpty(_filter)
-            ),
-            _queryClient
-        );
-
-        if (!string.IsNullOrEmpty(_filter))
-        {
-            await _query.ExecuteAsync();
-        }
-
-        RenderUI();
-    }
-}
-```
-
-**Key Differences**:
-- React Query: Hook-based, automatic reactivity
-- SwrSharp: Class-based, manual execution
-- Both: Same `enabled` option behavior
 
 ## Note on skipToken
 

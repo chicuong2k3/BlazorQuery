@@ -124,8 +124,14 @@ public class UseInfiniteQuery<TData, TPageParam> : IDisposable
             IsFetching = true;
             OnChange?.Invoke();
 
-            var ctx = new QueryFunctionContext(_options.QueryKey, cancellationToken ?? CancellationToken.None, _options.Meta);
-            var firstPage = await _options.QueryFn(ctx, _options.InitialPageParam);
+            var ctx = new QueryFunctionContext(
+                _options.QueryKey, 
+                cancellationToken ?? CancellationToken.None, 
+                _options.Meta,
+                _options.InitialPageParam,
+                direction: FetchDirection.Forward,
+                client: _client);
+            var firstPage = await _options.QueryFn(ctx);
 
             _data.Pages.Clear();
             _data.PageParams.Clear();
@@ -180,8 +186,14 @@ public class UseInfiniteQuery<TData, TPageParam> : IDisposable
             if (nextPageParam == null)
                 return;
 
-            var ctx = new QueryFunctionContext(_options.QueryKey, cancellationToken ?? CancellationToken.None, _options.Meta);
-            var nextPage = await _options.QueryFn(ctx, nextPageParam);
+            var ctx = new QueryFunctionContext(
+                _options.QueryKey, 
+                cancellationToken ?? CancellationToken.None, 
+                _options.Meta,
+                nextPageParam,
+                direction: FetchDirection.Forward,
+                client: _client);
+            var nextPage = await _options.QueryFn(ctx);
 
             _data.Pages.Add(nextPage);
             _data.PageParams.Add(nextPageParam);
@@ -242,8 +254,14 @@ public class UseInfiniteQuery<TData, TPageParam> : IDisposable
             if (prevPageParam == null)
                 return;
 
-            var ctx = new QueryFunctionContext(_options.QueryKey, cancellationToken ?? CancellationToken.None, _options.Meta);
-            var prevPage = await _options.QueryFn(ctx, prevPageParam);
+            var ctx = new QueryFunctionContext(
+                _options.QueryKey, 
+                cancellationToken ?? CancellationToken.None, 
+                _options.Meta,
+                prevPageParam,
+                direction: FetchDirection.Backward,
+                client: _client);
+            var prevPage = await _options.QueryFn(ctx);
 
             _data.Pages.Insert(0, prevPage);
             _data.PageParams.Insert(0, prevPageParam);
@@ -296,8 +314,14 @@ public class UseInfiniteQuery<TData, TPageParam> : IDisposable
             // Refetch each page sequentially using stored page params
             foreach (var pageParam in pageParamsToRefetch)
             {
-                var ctx = new QueryFunctionContext(_options.QueryKey, cancellationToken ?? CancellationToken.None, _options.Meta);
-                var page = await _options.QueryFn(ctx, (TPageParam)pageParam!);
+                var ctx = new QueryFunctionContext(
+                    _options.QueryKey, 
+                    cancellationToken ?? CancellationToken.None, 
+                    _options.Meta,
+                    pageParam,
+                    direction: FetchDirection.Forward,
+                    client: _client);
+                var page = await _options.QueryFn(ctx);
                 
                 newPages.Add(page);
                 newPageParams.Add(pageParam);

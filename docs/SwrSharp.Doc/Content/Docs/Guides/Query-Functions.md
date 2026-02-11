@@ -5,7 +5,7 @@ order: 2
 category: "Guides"
 ---
 
-﻿
+
 # What is a Query Function?
 
 A **Query Function** is any asynchronous method that fetches data. 
@@ -16,8 +16,9 @@ Query functions receive a `QueryFunctionContext` that provides:
 - `QueryKey`: uniquely identifies the query.
 - `Signal`: a `CancellationToken` that allows query cancellation.
 - `Meta`: optional metadata for the query.
-- `PageParam`: (For infinite queries only) the parameter for fetching the current 
-page — see [Infinite Queries]() for details.
+- `PageParam`: (for infinite queries only) the parameter for fetching the current page.
+- `Direction`: (for infinite queries only) `Forward` or `Backward` indicating fetch direction.
+- `Client`: access to the `QueryClient` instance for cache operations.
 
 # Basic Usage
 
@@ -25,7 +26,7 @@ You can define a query function in several ways depending on your needs, includi
 lambdas or extracted methods:
 
 ```csharp
-// Simple query without parameters
+// Simple query — fetches a fixed resource (no dynamic parameters)
 var query = new UseQuery<List<string>>(
     new QueryOptions<List<string>>(
         queryKey: new("todos"),
@@ -34,33 +35,35 @@ var query = new UseQuery<List<string>>(
     _queryClient
 );
 
-// Query with a parameter
+// Query with parameter — fetches different data based on todoId
+// The parameter is captured from outer scope (closure)
+var todoId = 5;
 var query = new UseQuery<string>(
     new QueryOptions<string>(
-        queryKey: new("todo", todoId),
-        queryFn: async ctx => await FakeApi.GetTodoByIdAsync(todoId)
+        queryKey: new("todo", todoId),  // todoId is part of the key
+        queryFn: async ctx => await FakeApi.GetTodoByIdAsync(todoId)  // todoId captured here
     ),
     _queryClient
 );
 
-// Access query key values from context
+// Better approach: extract parameter from QueryKey (no closure needed)
 var query = new UseQuery<string>(
     new QueryOptions<string>(
         queryKey: new("todo", todoId),
         queryFn: async ctx => {
-            var id = (int)ctx.QueryKey[1]!;
+            var id = (int)ctx.QueryKey[1]!;  // Get todoId from query key
             return await FakeApi.GetTodoByIdAsync(id);
         }
     ),
     _queryClient
 );
 
-// Destructuring context
+// Cleanest: use destructuring
 var query = new UseQuery<string>(
     new QueryOptions<string>(
         queryKey: new("todo", todoId),
         queryFn: async ctx => {
-            var (queryKey, signal) = ctx; // Destructure!
+            var (queryKey, signal) = ctx;
             var id = (int)queryKey[1]!;
             return await FakeApi.GetTodoByIdAsync(id);
         }
@@ -69,15 +72,14 @@ var query = new UseQuery<string>(
 );
 ```
 
+> **Why extract from QueryKey?** Using `ctx.QueryKey` instead of closure variables makes 
+> your query function reusable and ensures consistency between the cache key and the 
+> fetched data.
+
+# Extracted Query Functions
+
 ```csharp
 // Extracted query function for reusability
-async Task<List<string>> FetchTodosAsync(QueryFunctionContext ctx)
-{
-    var status = (string?)ctx.QueryKey[1];
-    return await FakeApi.GetTodosAsync(status);
-}
-
-// Or with destructuring
 async Task<List<string>> FetchTodosAsync(QueryFunctionContext ctx)
 {
     var (queryKey, signal, meta) = ctx; // Destructure all properties!
@@ -97,7 +99,7 @@ var query = new UseQuery<List<string>>(
 # Handling Errors
 
 SwrSharp tracks query errors automatically. A query is considered failed if the function:
-- Throws an exception (synchronously or asynchronously), or
+- Throws an exception, or
 - Returns a faulted `Task<T>`
 
 ```csharp
@@ -128,15 +130,14 @@ if (query.IsError)
 C# supports **deconstruction** (similar to JavaScript destructuring) for `QueryFunctionContext`:
 
 ```csharp
-// JavaScript/TypeScript style:
-// const { queryKey, signal, meta } = ctx;
-
-// C# equivalent:
 var (queryKey, signal, meta) = ctx;
+
+// For infinite queries (includes pageParam):
+var (queryKey, signal, meta, pageParam) = ctx;
 ```
 
 **Benefits:**
-- Cleaner code, closer to JavaScript/TypeScript patterns
+- Cleaner code
 - Extract only what you need
 - More readable when you use multiple properties
 
@@ -150,7 +151,7 @@ queryFn: async ctx => {
     return await http.GetAsync($"/api/todo/{id}", signal);
 }
 
-// Destructure all properties
+// Destructure all properties (for regular queries)
 queryFn: async ctx => {
     var (queryKey, signal, meta) = ctx;
     
@@ -158,6 +159,13 @@ queryFn: async ctx => {
         return await FetchDetailedTodoAsync(queryKey, signal);
     
     return await FetchBasicTodoAsync(queryKey, signal);
+}
+
+// Destructure with pageParam (for infinite queries)
+queryFn: async ctx => {
+    var (queryKey, signal, meta, pageParam) = ctx;
+    var cursor = (int?)pageParam ?? 0;
+    return await FetchProjectsAsync(cursor, signal);
 }
 
 // Ignore unused properties with discard
@@ -241,3 +249,4 @@ var query = new UseQuery<string>(
     _queryClient
 );
 ```
+

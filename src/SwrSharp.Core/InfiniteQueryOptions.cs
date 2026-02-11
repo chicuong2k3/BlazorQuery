@@ -7,7 +7,7 @@ public class InfiniteQueryOptions<TData, TPageParam>
 {
     public InfiniteQueryOptions(
         QueryKey queryKey,
-        Func<QueryFunctionContext, TPageParam, Task<TData>> queryFn,
+        Func<QueryFunctionContext, Task<TData>> queryFn,
         TPageParam initialPageParam,
         Func<TData, List<TData>, TPageParam?, TPageParam?>? getNextPageParam = null,
         Func<TData, List<TData>, TPageParam?, TPageParam?>? getPreviousPageParam = null,
@@ -48,9 +48,10 @@ public class InfiniteQueryOptions<TData, TPageParam>
     public QueryKey QueryKey { get; init; }
     
     /// <summary>
-    /// Query function that receives context and page param.
+    /// Query function that receives context (including pageParam via ctx.PageParam).
+    /// Cast ctx.PageParam to TPageParam to use it.
     /// </summary>
-    public Func<QueryFunctionContext, TPageParam, Task<TData>> QueryFn { get; init; }
+    public Func<QueryFunctionContext, Task<TData>> QueryFn { get; init; }
     
     /// <summary>
     /// Initial page parameter (required).

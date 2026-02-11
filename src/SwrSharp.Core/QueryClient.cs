@@ -213,6 +213,37 @@ public class QueryClient : IDisposable
     public void SetQueryData<T>(QueryKey key, T value) => Set(key, value);
 
     /// <summary>
+    /// Prefetches a query and stores the result in cache.
+    /// Useful for preloading data before it's needed.
+    /// If the data exists and is not stale, the query will not be executed.
+    /// </summary>
+    /// <typeparam name="T">The type of data returned by the query.</typeparam>
+    /// <param name="options">The query options containing queryKey, queryFn, and other settings.</param>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    public async Task PrefetchQueryAsync<T>(QueryOptions<T> options, CancellationToken cancellationToken = default)
+    {
+        if (options.QueryFn == null)
+        {
+            throw new InvalidOperationException("QueryFn is required for prefetching");
+        }
+
+        var ctx = new QueryFunctionContext(
+            options.QueryKey, 
+            cancellationToken, 
+            options.Meta,
+            pageParam: null,
+            direction: null,
+            client: this);
+
+        await FetchAsync(
+            options.QueryKey,
+            _ => options.QueryFn(ctx),
+            options.StaleTime,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Invalidates queries matching the filters.
     /// Marks them as stale and triggers refetch if they are currently active.
     /// </summary>

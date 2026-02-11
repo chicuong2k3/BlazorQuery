@@ -261,7 +261,7 @@ public partial class MainWindow : Window
 For Avalonia applications:
 
 ```csharp
-public class AvalonilaFocusManager : IFocusManager
+public class AvaloniaFocusManager : IFocusManager
 {
     private readonly Window _window;
     private bool _isFocused;
@@ -379,18 +379,18 @@ public class MauiFocusManager : IFocusManager
 
 ## Custom Event Listener
 
-In rare circumstances, you may want to manage your own focus events. Use `SetEventListener` to provide custom focus detection:
+In rare circumstances, you may want to manage your own focus events. Use `SetEventListener` on the QueryClient's FocusManager:
 
 ```csharp
-var focusManager = new DefaultFocusManager();
+var queryClient = new QueryClient();
 
-focusManager.SetEventListener((handleFocus) => {
+queryClient.FocusManager.SetEventListener((handleFocus) => {
     // Your custom focus detection logic
     
-    // Example: Using a timer
-    var timer = new Timer(1000);
+    // Example: Using a timer to poll focus state
+    var timer = new System.Timers.Timer(1000);
     timer.Elapsed += (s, e) => {
-        // Check if window is focused
+        // Check if window is focused (platform-specific)
         bool isFocused = CheckIfWindowIsFocused();
         handleFocus(isFocused);
     };
@@ -525,57 +525,4 @@ var notificationsQuery = new UseQuery<List<Notification>>(
     ),
     queryClient
 );
-```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-// Per-query
-const { data } = useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  refetchOnWindowFocus: false,
-})
-
-// Global
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-    },
-  },
-})
-
-// Custom focus manager
-focusManager.setEventListener((handleFocus) => {
-  // Custom logic
-  return () => { /* cleanup */ }
-})
-```
-
-### SwrSharp (C#):
-```csharp
-// Per-query
-var query = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        refetchOnWindowFocus: false
-    ),
-    queryClient
-);
-
-// Global
-var queryClient = new QueryClient()
-{
-    DefaultRefetchOnWindowFocus = false
-};
-
-// Custom focus manager
-var focusManager = new MyCustomFocusManager();
-queryClient.FocusManager.SetEventListener((handleFocus) => {
-    // Custom logic
-    return () => { /* cleanup */ };
-});
 ```

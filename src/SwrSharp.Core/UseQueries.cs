@@ -75,6 +75,12 @@ public class UseQueries : IDisposable
     private readonly List<IDisposable> _queries = new();
     private readonly List<Action> _unsubscribeActions = new();
 
+    /// <summary>
+    /// Access to the underlying query instances.
+    /// Use reflection or cast to access typed data.
+    /// </summary>
+    public IReadOnlyList<IDisposable> Queries => _queries;
+    
     public event Action? OnChange;
 
     public UseQueries(QueryClient client)
