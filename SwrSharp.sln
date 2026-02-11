@@ -4,9 +4,6 @@ VisualStudioVersion = 18.3.11206.111 d18.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}"
 	ProjectSection(SolutionItems) = preProject
-		1. Query Keys.md = 1. Query Keys.md
-		2. Query Functions.md = 2. Query Functions.md
-		3. Network Mode.md = 3. Network Mode.md
 		4. Query Retries.md = 4. Query Retries.md
 	EndProjectSection
 EndProject
