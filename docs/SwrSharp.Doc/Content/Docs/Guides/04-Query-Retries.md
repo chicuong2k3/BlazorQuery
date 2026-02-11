@@ -6,121 +6,168 @@ category: "Guides"
 ---
 
 
-
 # Query Retries in SwrSharp
 
-When a query fails (the query function throws an exception), **SwrSharp** will automatically retry 
-the query if the number of consecutive retries has not exceeded the limit specified 
-in the query options.
+When a query fails (the query function throws an exception), **SwrSharp** can automatically 
+retry the query based on the retry configuration in `QueryOptions<T>`.
 
-You can configure retries both on a global level (via `QueryClient` defaults) and 
-on an individual query level (`QueryOptions<T>`).
+## Retry Options
 
-### Retry Options
+| Option | Type | Description |
+|--------|------|-------------|
+| `Retry` | `int?` | Number of retries after initial attempt. Default: `3` |
+| `RetryInfinite` | `bool` | If `true`, retry indefinitely until success |
+| `RetryFunc` | `Func<int, Exception, bool>` | Custom retry logic based on attempt index and error |
+| `RetryDelay` | `TimeSpan?` | Fixed delay between retries |
+| `RetryDelayFunc` | `Func<int, TimeSpan>` | Custom delay function based on attempt index |
+| `MaxRetryDelay` | `TimeSpan?` | Maximum delay cap (default: 30 seconds) |
 
-- Setting `Retry = 0` will disable retries.
-- Setting `Retry = 6` will retry failing requests **6 times** before showing the final error (7 total attempts).
-- Setting `RetryInfinite = true` will infinitely retry failing requests.
-- Custom retry logic can be provided via `RetryFunc: Func<int, Exception, bool>`, 
-allowing conditional retries depending on the attempt number or exception.
-- Retries apply only when an exception is thrown from the query function.
-
-**Note**: This matches React Query behavior exactly. `retry: 6` means 6 retries **after** 
-the initial attempt, for a total of 7 attempts.
+**Examples:**
 
 ```csharp
+// Default behavior: 3 retries (4 total attempts: 1 initial + 3 retries)
 var query = new UseQuery<string>(
     new QueryOptions<string>(
-        queryKey: new("todos", 1),
-        queryFn: async ctx => await FetchTodoListPageAsync(),
-        staleTime: TimeSpan.FromMinutes(5),
-        networkMode: NetworkMode.Online,
-        refetchOnReconnect: true,
-        retry: 10 // Will retry failed requests 10 times (11 total attempts)
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync()
+        // Retry defaults to 3
     ),
     queryClient
 );
-```
 
-### FailureReason Property
-
-During retry attempts, the error from each failed attempt is available via the `FailureReason` property.
-After the last retry attempt fails, this error becomes the `Error` property.
-
-```csharp
-// During retries
-if (query.FailureReason != null)
-{
-    Console.WriteLine($"Retry attempt failed: {query.FailureReason.Message}");
-}
-
-// After all retries exhausted
-if (query.Error != null)
-{
-    Console.WriteLine($"Final error: {query.Error.Message}");
-}
-```
-
-# Retry Delay
-
-Retries in SwrSharp are not immediate. A backoff delay is applied between retry 
-attempts to reduce load and collisions.
-
-By default, **SwrSharp uses exponential backoff** matching React Query:
-- Starts at **1000ms** for the first retry
-- Doubles with each retry: 1000ms → 2000ms → 4000ms → 8000ms...
-- Maximum delay is capped by `MaxRetryDelay` (default: 30 seconds)
-- Formula: `Math.Min(1000 * 2^attemptIndex, 30000)`
-- Optionally, a custom retry delay function can be provided via 
-`RetryDelayFunc: Func<int, TimeSpan>` where `attemptIndex` starts at 0 for the first retry.
-
-```csharp
-int delayMs;
-if (_queryOptions.RetryDelayFunc != null)
-{
-    delayMs = (int)_queryOptions.RetryDelayFunc(attemptIndex).TotalMilliseconds;
-}
-else
-{
-    // Default: Math.min(1000 * 2^attemptIndex, 30000)
-    double expDelay = 1000 * Math.Pow(2, attemptIndex);
-    delayMs = (int)Math.Min(expDelay, maxRetryDelay.TotalMilliseconds);
-}
-
-await Task.Delay(delayMs, cancellationToken);
-```
-
-# Custom Retry Delay
-
-- Provide a custom delay function via `RetryDelayFunc: Func<int, TimeSpan>`.
-- The function receives `attemptIndex` (0-based: 0 = first retry, 1 = second retry, etc.) 
-and returns a `TimeSpan` to wait before the next retry.
-
-```csharp
+// Disable retries
 var query = new UseQuery<string>(
     new QueryOptions<string>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        retry: 5,
-        retryDelayFunc: (attemptIndex) => {
-            // Custom logic: shorter delay for first few attempts
-            if (attemptIndex < 2)
-                return TimeSpan.FromMilliseconds(500);
-            return TimeSpan.FromSeconds(5);
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retry: 0  // No retries — fails immediately on error
+    ),
+    queryClient
+);
+
+// Custom retry count: 5 retries (6 total attempts)
+var query = new UseQuery<string>(
+    new QueryOptions<string>(
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retry: 5
+    ),
+    queryClient
+);
+
+// Infinite retries until success
+var query = new UseQuery<string>(
+    new QueryOptions<string>(
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retryInfinite: true
+    ),
+    queryClient
+);
+
+// Custom retry logic — only retry on specific errors
+var query = new UseQuery<string>(
+    new QueryOptions<string>(
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retryFunc: (attemptIndex, error) => {
+            // attemptIndex: 0 = first retry, 1 = second retry, etc.
+            // Don't retry on 404 errors
+            if (error is HttpRequestException { StatusCode: HttpStatusCode.NotFound })
+                return false;
+            // Retry up to 5 times for other errors
+            return attemptIndex < 5;
         }
     ),
     queryClient
 );
 ```
 
-Or set a constant delay:
+
+## FailureReason Property
+
+During retry attempts, the error from each failed attempt is available via the `FailureReason` property.
+After the last retry attempt fails, this error becomes the `Error` property.
 
 ```csharp
+// During retries — FailureReason shows the current error
+if (query.FailureReason != null && query.Error == null)
+{
+    Console.WriteLine($"Attempt failed, retrying: {query.FailureReason.Message}");
+}
+
+// After all retries exhausted — Error is set
+if (query.Error != null)
+{
+    Console.WriteLine($"Query failed: {query.Error.Message}");
+}
+```
+
+# Retry Delay
+
+Retries are not immediate — a backoff delay is applied between attempts.
+
+**Default behavior (exponential backoff):**
+- First retry: **1000ms** (1 second)
+- Second retry: **2000ms** (2 seconds)  
+- Third retry: **4000ms** (4 seconds)
+- And so on: `1000 * 2^attemptIndex`
+- Maximum delay capped at **30 seconds** (configurable via `MaxRetryDelay`)
+
+```csharp
+// Default exponential backoff
 var query = new UseQuery<string>(
     new QueryOptions<string>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        retryDelay: TimeSpan.FromSeconds(1) // Always wait 1 second
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retry: 5  // Delays: 1s, 2s, 4s, 8s, 16s
+    ),
+    queryClient
+);
+
+// Custom max delay
+var query = new UseQuery<string>(
+    new QueryOptions<string>(
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retry: 10,
+        maxRetryDelay: TimeSpan.FromSeconds(10)  // Cap at 10 seconds
+    ),
+    queryClient
+);
+```
+
+# Custom Retry Delay
+
+Provide a custom delay function via `RetryDelayFunc`:
+
+```csharp
+// Custom delay logic
+var query = new UseQuery<string>(
+    new QueryOptions<string>(
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retry: 5,
+        retryDelayFunc: attemptIndex => {
+            // attemptIndex: 0 = first retry, 1 = second retry, etc.
+            // Fast retries first, then slow down
+            return attemptIndex switch {
+                0 => TimeSpan.FromMilliseconds(100),  // 100ms
+                1 => TimeSpan.FromMilliseconds(500),  // 500ms
+                _ => TimeSpan.FromSeconds(5)          // 5s for remaining
+            };
+        }
+    ),
+    queryClient
+);
+
+// Fixed delay (no backoff)
+var query = new UseQuery<string>(
+    new QueryOptions<string>(
+        queryKey: new("data"),
+        queryFn: async ctx => await FetchDataAsync(),
+        retry: 3,
+        retryDelay: TimeSpan.FromSeconds(1)  // Always wait 1 second
     ),
     queryClient
 );
@@ -128,54 +175,52 @@ var query = new UseQuery<string>(
 
 # Pause and Continue on Network Changes
 
-If a query is running and you go offline while the fetch is still in progress,
-SwrSharp will pause the retry mechanism:
+When using `NetworkMode.Online` or `NetworkMode.OfflineFirst`, retries pause when going offline:
 
-- **During active fetch**: The current fetch is cancelled and the query enters `Paused` state.
-- **During retry delay**: The retry waits for the network to return before continuing.
-- **Resume behavior**: Once back online, the query **continues** from where it left off
-  (same attempt count) — this is NOT a refetch.
-- **Cancellation**: If the query was cancelled while paused (e.g., component disposed),
-  it will not continue when the network returns.
+| Scenario | Behavior |
+|----------|----------|
+| **During active fetch** | Fetch is cancelled, query enters `Paused` state |
+| **During retry delay** | Delay waits for network to return |
+| **When back online** | Query **continues** from where it left off (same attempt count) |
+| **If disposed while paused** | Query will not continue |
 
-This behavior only applies to `NetworkMode.Online` and `NetworkMode.OfflineFirst`.
-Queries with `NetworkMode.Always` do not pause and will fail immediately if the network is unavailable.
+> **Important**: This is a **continue** operation, not a refetch. The attempt count is preserved.
+
+Queries with `NetworkMode.Always` do not pause — they fail immediately if the network is unavailable.
 
 # Failure Tracking
 
-SwrSharp provides properties to track retry failures:
-
-- **`FailureCount`**: The number of failed attempts so far (increments with each retry failure).
-- **`FailureReason`**: The exception from the most recent retry attempt. This is available during
-  retry attempts before the final `Error` is set. After the last retry fails, this becomes the `Error`.
+| Property | Description |
+|----------|-------------|
+| `FailureCount` | Number of failed attempts so far (increments with each failure) |
+| `FailureReason` | Exception from the most recent failed attempt |
+| `Error` | Final error after all retries exhausted |
 
 ```csharp
-// During retries, FailureReason contains the current error
-if (query.FailureCount > 0 && query.FailureReason != null)
-{
-    Console.WriteLine($"Attempt {query.FailureCount} failed: {query.FailureReason.Message}");
-}
-
-// After all retries exhausted, Error is set
-if (query.Error != null)
-{
-    Console.WriteLine($"Query failed after {query.FailureCount} attempts: {query.Error.Message}");
-}
+// Monitor retry progress
+query.OnChange += () => {
+    if (query.FailureCount > 0 && query.Error == null)
+    {
+        // Still retrying
+        Console.WriteLine($"Attempt {query.FailureCount} failed: {query.FailureReason?.Message}");
+        Console.WriteLine($"Retrying...");
+    }
+    else if (query.Error != null)
+    {
+        // All retries exhausted
+        Console.WriteLine($"Failed after {query.FailureCount} attempts: {query.Error.Message}");
+    }
+};
 ```
 
-# Background Retry Behavior
+# Not Yet Implemented
 
-> **Not yet implemented**: TanStack Query supports `refetchIntervalInBackground` which pauses
-> interval refetches when the browser tab is inactive. This is a browser-specific feature.
+> **`refetchIntervalInBackground`**: React Query pauses interval refetches when the browser tab 
+> is inactive. This is browser-specific and not implemented in SwrSharp.
 >
-> In Blazor Server, the connection remains active regardless of tab visibility.
-> In Blazor WebAssembly, you could implement this using the Page Visibility API via JS interop
-> and conditionally pause/resume the query's refetch interval.
->
-> If you need this feature, consider implementing a custom solution:
+> For Blazor WebAssembly, you can implement this manually using the Page Visibility API via JS interop:
 >
 > ```csharp
-> // Example: Manual control of refetch interval based on visibility
 > @inject IJSRuntime JS
 >
 > @code {
@@ -185,7 +230,6 @@ if (query.Error != null)
 >     {
 >         if (firstRender)
 >         {
->             // Set up visibility change listener via JS interop
 >             await JS.InvokeVoidAsync("setupVisibilityListener",
 >                 DotNetObjectReference.Create(this));
 >         }
@@ -195,7 +239,7 @@ if (query.Error != null)
 >     public void OnVisibilityChange(bool isVisible)
 >     {
 >         _isVisible = isVisible;
->         // Manually pause/resume refetch or dispose/recreate query
+>         // Pause/resume refetch based on visibility
 >     }
 > }
 > ```

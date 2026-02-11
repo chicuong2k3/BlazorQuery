@@ -569,7 +569,13 @@ public class UseQuery<T> : IDisposable
             {
                 try
                 {
-                    var ctx = new QueryFunctionContext(_queryOptions.QueryKey, token, _queryOptions.Meta);
+                    var ctx = new QueryFunctionContext(
+                        _queryOptions.QueryKey, 
+                        token, 
+                        _queryOptions.Meta,
+                        pageParam: null,
+                        direction: null,
+                        client: _client);
                     var fetchedData = await _client.FetchAsync(_queryOptions.QueryKey,
                                                     _ => _queryOptions.QueryFn!(ctx),
                                                     _queryOptions.StaleTime,
@@ -617,18 +623,23 @@ public class UseQuery<T> : IDisposable
                     
                     bool shouldRetry = false;
 
-                    // Retry logic:
-                    // - retry: false = no retries
-                    // - retry: true = infinite retries  
-                    // - retry: 6 = retry 6 times after initial (7 total attempts)
-                    // - retry: (failureCount, error) => custom logic (failureCount starts at 0)
+                    // Retry logic (matches React Query):
+                    // - RetryInfinite = true: infinite retries
+                    // - RetryFunc != null: custom logic (attemptIndex, error) => bool
+                    // - Retry = N: retry N times after initial (N+1 total attempts)
+                    // - Retry = null (default): retry 3 times (matching React Query default)
+                    
+                    const int defaultRetryCount = 3; 
                     
                     if (_queryOptions.RetryInfinite) 
                         shouldRetry = true;
-                    else if (_queryOptions.Retry.HasValue && attemptIndex < _queryOptions.Retry.Value) 
-                        shouldRetry = true;
                     else if (_queryOptions.RetryFunc != null) 
                         shouldRetry = _queryOptions.RetryFunc(attemptIndex, ex);
+                    else
+                    {
+                        var maxRetries = _queryOptions.Retry ?? defaultRetryCount;
+                        shouldRetry = attemptIndex < maxRetries;
+                    }
 
                     if (!shouldRetry)
                     {

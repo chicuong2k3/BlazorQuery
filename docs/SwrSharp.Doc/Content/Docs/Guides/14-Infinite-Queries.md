@@ -50,9 +50,10 @@ public class InfiniteProjectsComponent : IDisposable
         _query = new UseInfiniteQuery<ProjectsPage, int>(
             new InfiniteQueryOptions<ProjectsPage, int>(
                 queryKey: new("projects"),
-                queryFn: async (ctx, pageParam) => {
-                    // Fetch projects with cursor
-                    return await FetchProjectsAsync(pageParam);
+                queryFn: async ctx => {
+                    // Access pageParam from context (matches React Query behavior)
+                    var cursor = (int)ctx.PageParam!;
+                    return await FetchProjectsAsync(cursor);
                 },
                 initialPageParam: 0, // Start from cursor 0 (required)
                 getNextPageParam: (lastPage, allPages, lastPageParam) => {
@@ -229,7 +230,7 @@ Implement bi-directional scrolling with `GetPreviousPageParam`:
 var query = new UseInfiniteQuery<ProjectsPage, int>(
     new InfiniteQueryOptions<ProjectsPage, int>(
         queryKey: new("projects"),
-        queryFn: async (ctx, pageParam) => await FetchProjectsAsync(pageParam),
+        queryFn: async ctx => await FetchProjectsAsync((int)ctx.PageParam!),
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages, lastPageParam) => 
             lastPage.NextCursor,
@@ -254,7 +255,7 @@ Limit the number of pages kept in memory for performance:
 var query = new UseInfiniteQuery<ProjectsPage, int>(
     new InfiniteQueryOptions<ProjectsPage, int>(
         queryKey: new("projects"),
-        queryFn: async (ctx, pageParam) => await FetchProjectsAsync(pageParam),
+        queryFn: async ctx => await FetchProjectsAsync((int)ctx.PageParam!),
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages, lastPageParam) => 
             lastPage.NextCursor,
@@ -278,8 +279,8 @@ If your API doesn't return a cursor, calculate it from the page param:
 var query = new UseInfiniteQuery<List<Project>, int>(
     new InfiniteQueryOptions<List<Project>, int>(
         queryKey: new("projects"),
-        queryFn: async (ctx, pageParam) => 
-            await FetchProjectsAsync(page: pageParam),
+        queryFn: async ctx => 
+            await FetchProjectsAsync(page: (int)ctx.PageParam!),
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages, lastPageParam) => {
             // Return null if no more data
@@ -376,7 +377,8 @@ data.pages.map(page =>
 var query = new UseInfiniteQuery<ProjectsPage, int>(
     new InfiniteQueryOptions<ProjectsPage, int>(
         queryKey: new("projects"),
-        queryFn: async (ctx, pageParam) => {
+        queryFn: async ctx => {
+            var pageParam = (int)ctx.PageParam!;
             return await FetchProjectsAsync(pageParam);
         },
         initialPageParam: 0,

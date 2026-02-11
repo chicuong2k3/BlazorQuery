@@ -150,15 +150,23 @@ public class QueryKey : IEquatable<QueryKey>
 
     private static bool AnonymousEquals(object a, object b)
     {
+        // Get non-null properties only (ignore null properties for equality)
         var propsA = a.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .OrderBy(p => p.Name);
+            .Where(p => p.GetValue(a) != null)
+            .OrderBy(p => p.Name)
+            .ToList();
         var propsB = b.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .OrderBy(p => p.Name);
+            .Where(p => p.GetValue(b) != null)
+            .OrderBy(p => p.Name)
+            .ToList();
 
-        if (propsA.Count() != propsB.Count()) return false;
+        if (propsA.Count != propsB.Count) return false;
 
         foreach (var (pa, pb) in propsA.Zip(propsB, (x, y) => (x, y)))
         {
+            // Property names must match
+            if (pa.Name != pb.Name) return false;
+            
             var valA = pa.GetValue(a);
             var valB = pb.GetValue(b);
             if (!PartEquals(valA, valB)) return false;
@@ -171,10 +179,14 @@ public class QueryKey : IEquatable<QueryKey>
         unchecked
         {
             int hash = 17;
+            // Only hash non-null properties (to match equality behavior)
             var props = a.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
-             .OrderBy(p => p.Name);
+                .Where(p => p.GetValue(a) != null)
+                .OrderBy(p => p.Name);
             foreach (var prop in props)
             {
+                // Include property name in hash for deterministic behavior
+                hash = hash * 31 + prop.Name.GetHashCode();
                 hash = hash * 31 + PartHash(prop.GetValue(a));
             }
             return hash;

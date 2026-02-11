@@ -135,5 +135,37 @@ public class QueryKeyTests
         Assert.Equal(hash1, hash2);
     }
 
+    [Fact]
+    public void Equal_WhenAnonymousHasExtraNullProperty_ShouldBeTrue()
+    {
+        // Null properties in anonymous objects should be ignored
+        var key1 = new QueryKey("todos", new { page = 2, status = "active" });
+        var key2 = new QueryKey("todos", new { page = 2, status = "active", other = (string?)null });
+
+        Assert.Equal(key1, key2);
+        Assert.Equal(key1.GetHashCode(), key2.GetHashCode());
+    }
+
+    [Fact]
+    public void Equal_WhenBothAnonymousHaveDifferentNullProperties_ShouldBeTrue()
+    {
+        // Both have different null properties - should still be equal (nulls ignored)
+        var key1 = new QueryKey("todos", new { page = 2, extra1 = (int?)null });
+        var key2 = new QueryKey("todos", new { page = 2, extra2 = (string?)null });
+
+        Assert.Equal(key1, key2);
+        Assert.Equal(key1.GetHashCode(), key2.GetHashCode());
+    }
+
+    [Fact]
+    public void NotEqual_WhenAnonymousHasExtraNonNullProperty_ShouldBeFalse()
+    {
+        // Extra non-null property should make them different
+        var key1 = new QueryKey("todos", new { page = 2 });
+        var key2 = new QueryKey("todos", new { page = 2, extra = "value" });
+
+        Assert.NotEqual(key1, key2);
+    }
+
     private record TodoRecord(int Id, string Status);
 }
