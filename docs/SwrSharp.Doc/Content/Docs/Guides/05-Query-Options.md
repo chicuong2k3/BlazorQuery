@@ -11,6 +11,33 @@ category: "Guides"
 
 One of the best ways to share `QueryKey` and `QueryFn` between multiple places, yet keep them co-located to one another, is to use **factory methods** that return `QueryOptions<T>`. This pattern allows you to define all possible options for a query in one place with full type safety and reusability.
 
+## Available Options
+
+`QueryOptions<T>` supports the following properties:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `QueryKey` | `QueryKey` | (required) | Unique identifier for the query |
+| `QueryFn` | `Func<QueryFunctionContext, Task<T>>` | `null` | Function that fetches the data |
+| `StaleTime` | `TimeSpan` | `TimeSpan.Zero` | How long data is considered fresh |
+| `NetworkMode` | `NetworkMode` | `Online` | How to handle offline state |
+| `RefetchOnReconnect` | `bool` | `true` | Refetch when network reconnects |
+| `RefetchOnWindowFocus` | `bool` | `true` | Refetch when window gains focus |
+| `RefetchInterval` | `TimeSpan?` | `null` | Polling interval |
+| `Retry` | `int?` | `3` | Number of retries (matches React Query default) |
+| `RetryInfinite` | `bool` | `false` | Retry indefinitely |
+| `RetryFunc` | `Func<int, Exception, bool>` | `null` | Custom retry logic |
+| `RetryDelay` | `TimeSpan?` | `null` | Fixed retry delay |
+| `RetryDelayFunc` | `Func<int, TimeSpan>` | `null` | Custom retry delay |
+| `MaxRetryDelay` | `TimeSpan?` | `30s` | Maximum retry delay |
+| `Enabled` | `bool` | `true` | Whether query should execute |
+| `Meta` | `IReadOnlyDictionary<string, object>?` | `null` | Custom metadata |
+| `InitialData` | `T?` | `null` | Initial data (persisted to cache) |
+| `InitialDataFunc` | `Func<T?>` | `null` | Lazy initial data |
+| `InitialDataUpdatedAt` | `DateTime?` | `null` | Timestamp of initial data |
+| `PlaceholderData` | `T?` | `null` | Placeholder (not cached) |
+| `PlaceholderDataFunc` | `Func<T?, QueryOptions<T>?, T?>` | `null` | Dynamic placeholder |
+
 ## Basic Pattern
 
 Instead of creating `QueryOptions` inline every time, create reusable factory methods:
@@ -224,47 +251,6 @@ var customQuery = new UseQuery<Group>(
 - Create too many variations of the same query
 - Forget to update all usages when changing query logic
 
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-import { queryOptions } from '@tanstack/react-query'
-
-function groupOptions(id: number) {
-  return queryOptions({
-    queryKey: ['groups', id],
-    queryFn: () => fetchGroups(id),
-    staleTime: 5 * 1000,
-  })
-}
-
-// Usage
-useQuery(groupOptions(1))
-queryClient.prefetchQuery(groupOptions(23))
-```
-
-### SwrSharp (C#):
-```csharp
-// No special helper needed - just use QueryOptions directly
-static QueryOptions<Group> GroupOptions(int id)
-{
-    return new QueryOptions<Group>(
-        queryKey: new("groups", id),
-        queryFn: async ctx => await FetchGroupsAsync(id),
-        staleTime: TimeSpan.FromSeconds(5)
-    );
-}
-
-// Usage - exactly the same pattern!
-var query = new UseQuery<Group>(GroupOptions(1), queryClient);
-await queryClient.PrefetchQueryAsync(GroupOptions(23));
-```
-
-**Key Difference**: In C#, we don't need a special `queryOptions()` helper because:
-1. `QueryOptions<T>` constructor already provides type safety
-2. Factory methods give us the same reusability
-3. Target-typed `new()` expressions keep it concise
-
 ## Summary
 
 Using factory methods to create reusable `QueryOptions<T>` provides:
@@ -273,5 +259,3 @@ Using factory methods to create reusable `QueryOptions<T>` provides:
 - ✅ Easy refactoring
 - ✅ Consistent query configuration
 - ✅ Reduced boilerplate
-
-This pattern is equivalent to React Query's `queryOptions` helper, but leverages C#'s type system and doesn't require a special helper function.

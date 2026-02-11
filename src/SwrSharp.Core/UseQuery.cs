@@ -9,6 +9,12 @@ public class UseQuery<T> : IDisposable
     private readonly QueryClient _client;
     private readonly IOnlineManager _onlineManager;
     private readonly QueryOptions<T> _queryOptions;
+    
+    /// <summary>
+    /// Access to the query options. Can be used to dynamically change Enabled state.
+    /// </summary>
+    public QueryOptions<T> Options => _queryOptions;
+    
     /// <summary>
     /// Cancellation for mid-fetch cancel on offline/refetch
     /// </summary>

@@ -13,36 +13,40 @@ Dependent (or serial) queries depend on previous ones to finish before they can 
 
 To create a dependent query, use the `enabled` option to tell a query when it is ready to run:
 
+
 ```csharp
-// Get the user
-var userQuery = new UseQuery<User>(
-    new QueryOptions<User>(
-        queryKey: new("user", email),
-        queryFn: async ctx => await GetUserByEmailAsync(email)
-    ),
-    queryClient
+// Both queries created at component initialization
+// At this point, userId is NOT yet available
+
+string? userId = null; // Will be set later
+
+var userOptions = new QueryOptions<User>(
+    queryKey: new("user", email),
+    queryFn: async ctx => await GetUserByEmailAsync(email)
 );
 
+var projectsOptions = new QueryOptions<List<Project>>(
+    queryKey: new("projects", userId),
+    queryFn: async ctx => await GetProjectsByUserAsync(userId!),
+    enabled: false // Initially disabled — userId not ready
+);
+
+var userQuery = new UseQuery<User>(userOptions, queryClient);
+var projectsQuery = new UseQuery<List<Project>>(projectsOptions, queryClient);
+
+// Subscribe to changes reactively
+userQuery.OnChange += async () => {
+    if (userQuery.IsSuccess && userQuery.Data != null)
+    {
+        userId = userQuery.Data.Id;
+        projectsOptions.Enabled = true; // NOW enable it
+        await projectsQuery.ExecuteAsync();
+    }
+};
+
+// Start loading user
 await userQuery.ExecuteAsync();
-var userId = userQuery.Data?.Id;
-
-// Then get the user's projects
-var projectsQuery = new UseQuery<List<Project>>(
-    new QueryOptions<List<Project>>(
-        queryKey: new("projects", userId),
-        queryFn: async ctx => await GetProjectsByUserAsync(userId!),
-        enabled: !string.IsNullOrEmpty(userId) // Only execute when userId exists
-    ),
-    queryClient
-);
-
-await projectsQuery.ExecuteAsync();
-
-// Access the results
-if (projectsQuery.IsSuccess)
-{
-    var projects = projectsQuery.Data;
-}
+// projectsQuery will be triggered by OnChange when user is ready
 ```
 
 ## Query State Transitions
@@ -193,7 +197,7 @@ foreach (var query in messagesQueries.Queries)
 
 ## Dynamic Enable/Disable
 
-You can dynamically change the `enabled` state:
+You can dynamically change the `Enabled` state. Since `UseQuery` holds a reference to the options object, changes are reflected immediately:
 
 ```csharp
 var options = new QueryOptions<Data>(
@@ -204,13 +208,19 @@ var options = new QueryOptions<Data>(
 
 var query = new UseQuery<Data>(options, queryClient);
 
-// Later, when condition is met
+// Query won't execute because enabled = false
+await query.ExecuteAsync(); // Does nothing
+
+// Later, when condition is met, enable it
 if (someDependencyIsReady)
 {
-    options.Enabled = true;
-    await query.ExecuteAsync();
+    options.Enabled = true; // Same options object
+    await query.ExecuteAsync(); // Now executes!
 }
 ```
+
+> **Note**: `UseQuery` holds a reference to the `QueryOptions` object, so changes to `Enabled` 
+> are immediately visible to the query.
 
 ## Reactive Pattern with Events
 
@@ -400,55 +410,3 @@ var projectsQuery = new UseQuery<List<Project>>(
 projectsOptions.Enabled = true;
 await projectsQuery.ExecuteAsync();
 ```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-// Get the user
-const { data: user } = useQuery({
-  queryKey: ['user', email],
-  queryFn: getUserByEmail,
-})
-
-const userId = user?.id
-
-// Then get the user's projects
-const { data: projects } = useQuery({
-  queryKey: ['projects', userId],
-  queryFn: getProjectsByUser,
-  enabled: !!userId, // Only run when userId exists
-})
-```
-
-### SwrSharp (C#):
-```csharp
-// Get the user
-var userQuery = new UseQuery<User>(
-    new QueryOptions<User>(
-        queryKey: new("user", email),
-        queryFn: async ctx => await GetUserByEmailAsync(email)
-    ),
-    queryClient
-);
-
-await userQuery.ExecuteAsync();
-var userId = userQuery.Data?.Id;
-
-// Then get the user's projects
-var projectsQuery = new UseQuery<List<Project>>(
-    new QueryOptions<List<Project>>(
-        queryKey: new("projects", userId),
-        queryFn: async ctx => await GetProjectsByUserAsync(userId!),
-        enabled: !string.IsNullOrEmpty(userId)
-    ),
-    queryClient
-);
-
-await projectsQuery.ExecuteAsync();
-```
-
-**Key Differences**:
-- SwrSharp requires explicit `await query.ExecuteAsync()` calls
-- React Query's hooks execute automatically when enabled
-- SwrSharp uses `!string.IsNullOrEmpty()` instead of `!!` operator

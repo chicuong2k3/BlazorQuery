@@ -195,6 +195,14 @@ public class MyComponent
         
         _queries.SetQueries(queryDefinitions);
         await _queries.ExecuteAllAsync();
+        
+        // Access results via reflection (less type-safe)
+        foreach (var query in _queries.Queries)
+        {
+            var dataProperty = query.GetType().GetProperty("Data");
+            var data = dataProperty?.GetValue(query);
+            Console.WriteLine($"Loaded: {data}");
+        }
     }
 }
 ```
@@ -356,31 +364,17 @@ var queries = userIds.Select(id =>
 );
 ```
 
-## Comparison with React Query
+## Not Yet Implemented
 
-### React Query (TypeScript):
-```typescript
-const userQueries = useQueries({
-  queries: users.map((user) => ({
-    queryKey: ['user', user.id],
-    queryFn: () => fetchUserById(user.id),
-  })),
-})
-```
+> **`combine` option**: React Query's `useQueries` supports a `combine` option to merge 
+> all query results into a single derived value. This is not yet implemented in SwrSharp.
+> You can achieve similar functionality manually:
+>
+> ```csharp
+> // Manual combine
+> var allUsers = _userQueries.Queries
+>     .Where(q => q.IsSuccess)
+>     .Select(q => q.Data!)
+>     .ToList();
+> ```
 
-### SwrSharp (C#):
-```csharp
-var userQueries = new UseQueries<User>(queryClient);
-userQueries.SetQueries(
-    users.Select(user => new QueryOptions<User>(
-        queryKey: new("user", user.Id),
-        queryFn: async ctx => await FetchUserByIdAsync(user.Id)
-    ))
-);
-await userQueries.ExecuteAllAsync();
-```
-
-**Key Differences**:
-- SwrSharp requires explicit `ExecuteAllAsync()` call
-- SwrSharp uses class instances instead of hooks
-- Type parameter `<T>` is required in C#

@@ -87,6 +87,7 @@ if (query.IsFetching)
 - `true` only when refetching with existing data
 - `false` during initial load (no data yet)
 - Useful to distinguish background refetch from initial load
+- Convenience property equivalent to `IsFetching && Data != null`
 
 ```csharp
 if (query.IsFetchingBackground)
@@ -466,76 +467,3 @@ public void OnNavigate()
     Navigate();
 }
 ```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-function Todos() {
-  const { status, data, error, isFetching } = useQuery({
-    queryKey: ['todos'],
-    queryFn: fetchTodos,
-  })
-
-  return status === 'pending' ? (
-    <span>Loading...</span>
-  ) : (
-    <>
-      {isFetching ? <div>Refreshing...</div> : null}
-      <TodoList todos={data} />
-    </>
-  )
-}
-
-// Global indicator
-function GlobalLoader() {
-  const isFetching = useIsFetching()
-  return isFetching ? <div>Loading...</div> : null
-}
-```
-
-### SwrSharp (C#):
-```csharp
-public class TodosComponent
-{
-    private UseQuery<List<Todo>> _query;
-
-    public void Render()
-    {
-        if (_query.Status == QueryStatus.Pending)
-        {
-            Console.WriteLine("Loading...");
-        }
-        else
-        {
-            if (_query.IsFetching)
-                Console.WriteLine("Refreshing...");
-            
-            RenderTodoList(_query.Data);
-        }
-    }
-}
-
-// Global indicator
-public class GlobalLoader
-{
-    private readonly QueryClient _client;
-    
-    public GlobalLoader(QueryClient client)
-    {
-        _client = client;
-        _client.OnFetchingChanged += Render;
-    }
-    
-    private void Render()
-    {
-        if (_client.IsFetching)
-            Console.WriteLine("Loading...");
-    }
-}
-```
-
-**Key Differences**:
-- React Query: `useIsFetching()` hook
-- SwrSharp: `QueryClient.IsFetching` property + `OnFetchingChanged` event
-- Both provide same functionality, adapted for platform
