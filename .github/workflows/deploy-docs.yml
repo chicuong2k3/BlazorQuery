@@ -19,6 +19,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install npm dependencies
+        run: npm ci
+        working-directory: ./docs/SwrSharp.Doc
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

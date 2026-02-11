@@ -1,0 +1,88 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './Components/**/*.razor',
+    './Components/**/*.html',
+    './wwwroot/**/*.html',
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: '#fef2f2',
+          100: '#fee2e2',
+          200: '#fecaca',
+          300: '#fca5a5',
+          400: '#f87171',
+          500: '#ef4444',
+          600: '#dc2626',
+          700: '#b91c1c',
+          800: '#991b1b',
+          900: '#7f1d1d',
+        }
+      },
+      typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            maxWidth: 'none',
+          }
+        },
+        invert: {
+          css: {
+            '--tw-prose-body': theme('colors.gray[300]'),
+            '--tw-prose-headings': theme('colors.white'),
+            '--tw-prose-links': theme('colors.red[400]'),
+            '--tw-prose-bold': theme('colors.white'),
+            '--tw-prose-counters': theme('colors.gray[400]'),
+            '--tw-prose-bullets': theme('colors.gray[600]'),
+            '--tw-prose-hr': theme('colors.gray[700]'),
+            '--tw-prose-quotes': theme('colors.gray[100]'),
+            '--tw-prose-quote-borders': theme('colors.gray[700]'),
+            '--tw-prose-captions': theme('colors.gray[400]'),
+            '--tw-prose-code': theme('colors.red[300]'),
+            '--tw-prose-pre-code': theme('colors.gray[200]'),
+            '--tw-prose-pre-bg': theme('colors.gray[900]'),
+            '--tw-prose-th-borders': theme('colors.gray[600]'),
+            '--tw-prose-td-borders': theme('colors.gray[700]'),
+            'code': {
+              backgroundColor: theme('colors.gray[800]'),
+              padding: '0.25rem 0.375rem',
+              borderRadius: '0.25rem',
+              fontWeight: '400',
+            },
+            'code::before': {
+              content: '""'
+            },
+            'code::after': {
+              content: '""'
+            },
+            'pre': {
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${theme('colors.gray[800]')}`,
+              borderRadius: '0.5rem',
+            },
+            'pre code': {
+              backgroundColor: 'transparent',
+              padding: '0',
+              borderRadius: '0',
+            },
+            'blockquote': {
+              borderLeftWidth: '4px',
+              borderLeftColor: theme('colors.blue[500]'),
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              paddingTop: '0.5rem',
+              paddingBottom: '0.5rem',
+              paddingLeft: '1rem',
+              paddingRight: '1rem',
+              borderRadius: '0 0.25rem 0.25rem 0',
+            }
+          }
+        }
+      })
+    },
+  },
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
+}

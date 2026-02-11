@@ -17,88 +17,7 @@
         })();
     </script>
 
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#fef2f2',
-                            100: '#fee2e2',
-                            200: '#fecaca',
-                            300: '#fca5a5',
-                            400: '#f87171',
-                            500: '#ef4444',
-                            600: '#dc2626',
-                            700: '#b91c1c',
-                            800: '#991b1b',
-                            900: '#7f1d1d',
-                        }
-                    },
-                    typography: (theme) => ({
-                        DEFAULT: {
-                            css: {
-                                maxWidth: 'none',
-                            }
-                        },
-                        invert: {
-                            css: {
-                                '--tw-prose-body': theme('colors.gray[300]'),
-                                '--tw-prose-headings': theme('colors.white'),
-                                '--tw-prose-links': theme('colors.red[400]'),
-                                '--tw-prose-bold': theme('colors.white'),
-                                '--tw-prose-counters': theme('colors.gray[400]'),
-                                '--tw-prose-bullets': theme('colors.gray[600]'),
-                                '--tw-prose-hr': theme('colors.gray[700]'),
-                                '--tw-prose-quotes': theme('colors.gray[100]'),
-                                '--tw-prose-quote-borders': theme('colors.gray[700]'),
-                                '--tw-prose-captions': theme('colors.gray[400]'),
-                                '--tw-prose-code': theme('colors.red[300]'),
-                                '--tw-prose-pre-code': theme('colors.gray[200]'),
-                                '--tw-prose-pre-bg': theme('colors.gray[900]'),
-                                '--tw-prose-th-borders': theme('colors.gray[600]'),
-                                '--tw-prose-td-borders': theme('colors.gray[700]'),
-                                'code': {
-                                    backgroundColor: theme('colors.gray[800]'),
-                                    padding: '0.25rem 0.375rem',
-                                    borderRadius: '0.25rem',
-                                    fontWeight: '400',
-                                },
-                                'code::before': {
-                                    content: '""'
-                                },
-                                'code::after': {
-                                    content: '""'
-                                },
-                                'pre': {
-                                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                                    border: `1px solid ${theme('colors.gray[800]')}`,
-                                    borderRadius: '0.5rem',
-                                },
-                                'pre code': {
-                                    backgroundColor: 'transparent',
-                                    padding: '0',
-                                    borderRadius: '0',
-                                },
-                                'blockquote': {
-                                    borderLeftWidth: '4px',
-                                    borderLeftColor: theme('colors.blue[500]'),
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                    paddingTop: '0.5rem',
-                                    paddingBottom: '0.5rem',
-                                    paddingLeft: '1rem',
-                                    paddingRight: '1rem',
-                                    borderRadius: '0 0.25rem 0.25rem 0',
-                                }
-                            }
-                        }
-                    })
-                },
-            },
-        }
-    </script>
+    <link rel="stylesheet" href="css/tailwind.css" />
 
     <!-- Prism.js themes (dual) -->
     <link id="prism-dark" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
@@ -112,169 +31,19 @@
         })();
     </script>
 
-    <style>
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f5f5f5;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #c0c0c0;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a0a0a0;
-        }
-        .dark ::-webkit-scrollbar-track {
-            background: #0d1117;
-        }
-        .dark ::-webkit-scrollbar-thumb {
-            background: #30363d;
-        }
-        .dark ::-webkit-scrollbar-thumb:hover {
-            background: #484f58;
-        }
-
-        /* Responsive images in prose content */
-        .prose img {
-            max-width: 100%;
-            height: auto;
-        }
-
-        /* Responsive tables - horizontal scroll */
-        .prose table {
-            display: block;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Code blocks don't overflow on mobile */
-        .prose pre {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Prevent long inline code from breaking layout */
-        .prose code {
-            word-break: break-word;
-        }
-        .prose pre code {
-            word-break: normal;
-        }
-
-        /* Prism overrides */
-        .prose pre[class*="language-"],
-        .prose code[class*="language-"] {
-            background: transparent !important;
-            text-shadow: none !important;
-            font-size: 0.8125rem !important;
-            line-height: 1.6 !important;
-        }
-        pre[class*="language-"] {
-            border-radius: 0.5rem !important;
-            margin: 0 !important;
-            padding: 1rem !important;
-            font-size: 0.8125rem !important;
-        }
-        .dark pre[class*="language-"] {
-            background: rgba(0, 0, 0, 0.3) !important;
-            border: 1px solid #30363d !important;
-        }
-        html:not(.dark) pre[class*="language-"] {
-            background: #f6f8fa !important;
-            border: 1px solid #d0d7de !important;
-        }
-
-        /* Code font size */
-        .prose pre code,
-        .prose code {
-            font-size: 0.8125rem !important;
-            font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace !important;
-            line-height: 1.6 !important;
-        }
-
-        /* Inline code */
-        .prose :not(pre) > code {
-            font-size: 0.875em !important;
-            padding: 0.125rem 0.375rem !important;
-        }
-
-        /* Code block wrapper */
-        .code-block-wrapper {
-            position: relative;
-        }
-
-        /* Language label */
-        .code-lang-label {
-            position: absolute;
-            top: 0;
-            left: 1rem;
-            font-size: 0.7rem;
-            padding: 0.15rem 0.5rem;
-            border-radius: 0 0 0.25rem 0.25rem;
-            font-family: ui-monospace, monospace;
-            z-index: 1;
-            background: #e8eaed;
-            color: #656d76;
-        }
-        .dark .code-lang-label {
-            background: #21262d;
-            color: #8b949e;
-        }
-
-        /* Copy button */
-        .copy-code-btn {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.7rem;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.2s, background 0.2s, color 0.2s;
-            z-index: 2;
-            background: #e8eaed;
-            border: 1px solid #d0d7de;
-            color: #656d76;
-        }
-        .dark .copy-code-btn {
-            background: #21262d;
-            border-color: #30363d;
-            color: #8b949e;
-        }
-        .code-block-wrapper:hover .copy-code-btn {
-            opacity: 1;
-        }
-        .copy-code-btn:hover {
-            background: #d0d7de;
-            color: #24292f;
-        }
-        .dark .copy-code-btn:hover {
-            background: #30363d;
-            color: #e6edf3;
-        }
-        .copy-code-btn.copied {
-            color: #1a7f37;
-            opacity: 1;
-        }
-        .dark .copy-code-btn.copied {
-            color: #3fb950;
-        }
-    </style>
-
     <HeadOutlet/>
 </head>
 
 <body class="bg-white dark:bg-[#0d1117] font-sans text-gray-800 dark:text-gray-300 antialiased">
 <Routes/>
 
-<!-- Prism.js core + autoloader -->
+<!-- Prism.js core + language components -->
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-csharp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-powershell.min.js"></script>
 
 <script>
     // Theme toggle
@@ -568,13 +337,30 @@
         initAll();
     }
 
+    var _initProcessing = false;
+    var _initTimer = null;
+
     document.addEventListener('DOMContentLoaded', function() {
         var observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.addedNodes.length) {
-                    setTimeout(initAll, 100);
+            if (_initProcessing) return;
+            var dominated = mutations.some(function(m) {
+                for (var i = 0; i < m.addedNodes.length; i++) {
+                    var node = m.addedNodes[i];
+                    if (node.nodeType === 1 && !node.classList.contains('code-block-wrapper') &&
+                        !node.classList.contains('copy-code-btn') && !node.classList.contains('code-lang-label') &&
+                        node.id !== 'search-modal') {
+                        return true;
+                    }
                 }
+                return false;
             });
+            if (!dominated) return;
+            clearTimeout(_initTimer);
+            _initTimer = setTimeout(function() {
+                _initProcessing = true;
+                initAll();
+                _initProcessing = false;
+            }, 300);
         });
         var main = document.querySelector('body');
         if (main) {
