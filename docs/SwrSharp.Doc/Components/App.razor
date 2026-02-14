@@ -34,7 +34,7 @@
     <HeadOutlet/>
 </head>
 
-<body class="bg-white dark:bg-[#0d1117] font-sans text-gray-800 dark:text-gray-300 antialiased">
+<body class="bg-white dark:bg-[#0a0a0a] font-sans text-gray-800 dark:text-gray-300 antialiased">
 <Routes/>
 
 <!-- Prism.js core + language components -->
@@ -169,14 +169,14 @@
         modal.innerHTML = `
             <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSearchModal()"></div>
             <div class="absolute top-[10%] left-1/2 -translate-x-1/2 w-full max-w-2xl px-4">
-                <div class="bg-white dark:bg-[#0d1117] border border-gray-200 dark:border-[#21262d] rounded-xl shadow-2xl overflow-hidden">
-                    <div class="flex items-center px-4 border-b border-gray-200 dark:border-[#21262d]">
+                <div class="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] rounded-xl shadow-2xl overflow-hidden">
+                    <div class="flex items-center px-4 border-b border-gray-200 dark:border-[#262626]">
                         <svg class="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                         <input id="search-modal-input" type="text" placeholder="Search documentation..."
                                class="flex-1 px-3 py-4 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none text-base">
-                        <kbd class="px-2 py-1 text-xs text-gray-500 bg-gray-100 dark:bg-[#161b22] rounded border border-gray-200 dark:border-[#21262d]">ESC</kbd>
+                        <kbd class="px-2 py-1 text-xs text-gray-500 bg-gray-100 dark:bg-[#262626] rounded border border-gray-200 dark:border-[#262626]">ESC</kbd>
                     </div>
                     <div id="search-results" class="max-h-[60vh] overflow-y-auto">
                         <div class="px-4 py-8 text-center text-gray-500 text-sm">
@@ -246,7 +246,7 @@
 
         searchResults.innerHTML = results.map(function(item, i) {
             var highlighted = item.title.replace(new RegExp('(' + escapeRegex(query) + ')', 'gi'), '<span class="text-red-400 font-semibold">$1</span>');
-            return '<a href="' + item.url + '" class="search-result flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-[#161b22] transition ' + (i === 0 ? 'bg-gray-100 dark:bg-[#161b22]' : '') + '" data-index="' + i + '">' +
+            return '<a href="' + item.url + '" class="search-result flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-[#262626] transition ' + (i === 0 ? 'bg-gray-100 dark:bg-[#262626]' : '') + '" data-index="' + i + '">' +
                 '<div class="flex-1"><div class="text-gray-900 dark:text-white text-sm">' + highlighted + '</div><div class="text-gray-500 text-xs mt-0.5">' + item.category + '</div></div>' +
                 '<svg class="w-4 h-4 text-gray-400 dark:text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></a>';
         }).join('');
@@ -275,10 +275,10 @@
     function updateSelection(results) {
         results.forEach(function(el, i) {
             if (i === selectedIndex) {
-                el.classList.add('bg-gray-100', 'dark:bg-[#161b22]');
+                el.classList.add('bg-gray-100', 'dark:bg-[#262626]');
                 el.scrollIntoView({ block: 'nearest' });
             } else {
-                el.classList.remove('bg-gray-100', 'dark:bg-[#161b22]');
+                el.classList.remove('bg-gray-100', 'dark:bg-[#262626]');
             }
         });
     }

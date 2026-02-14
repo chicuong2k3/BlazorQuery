@@ -273,7 +273,7 @@ public class AvaloniaFocusManager : IFocusManager
     public bool IsFocused => _isFocused;
     public event Action<bool>? FocusChanged;
 
-    public AvalonilaFocusManager(Window window)
+    public AvaloniaFocusManager(Window window)
     {
         _window = window;
         _isFocused = window.IsActive;

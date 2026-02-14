@@ -12,28 +12,34 @@ SwrSharp provides several strategies to optimize component rendering and reduce 
 
 ## Minimize Re-renders
 
-### Use Shouldupdate Pattern
+### Use ShouldRender Pattern
 
 ```csharp
 @code {
-    private UseQueryResult<Todo[]>? Query;
-    private Todo[]? previousData;
+    private UseQuery<List<Todo>>? _todosQuery;
+    private List<Todo>? _previousData;
 
     protected override async Task OnInitializedAsync()
     {
-        Query = await QueryClient.UseQuery(
-            queryKey: new QueryKey("todos"),
-            queryFn: FetchTodos
+        _todosQuery = new UseQuery<List<Todo>>(
+            new QueryOptions<List<Todo>>(
+                queryKey: new("todos"),
+                queryFn: async ctx => await FetchTodosAsync()
+            ),
+            QueryClient
         );
+
+        _todosQuery.OnChange += StateHasChanged;
+        await _todosQuery.ExecuteAsync();
     }
 
     protected override bool ShouldRender()
     {
         // Only re-render if data actually changed
-        if (Query?.Data == previousData)
+        if (_todosQuery?.Data == _previousData)
             return false;
 
-        previousData = Query?.Data;
+        _previousData = _todosQuery?.Data;
         return true;
     }
 }
@@ -47,25 +53,37 @@ Instead of one large query, split into smaller ones:
 
 ```csharp
 // Instead of one query with all data
-var allData = await QueryClient.UseQuery(
-    new QueryKey("everything"),
-    FetchEverything
+var allDataQuery = new UseQuery<Everything>(
+    new QueryOptions<Everything>(
+        queryKey: new("everything"),
+        queryFn: async ctx => await FetchEverythingAsync()
+    ),
+    queryClient
 );
 
 // Use multiple focused queries
-var todos = await QueryClient.UseQuery(
-    new QueryKey("todos"),
-    FetchTodos
+var todosQuery = new UseQuery<List<Todo>>(
+    new QueryOptions<List<Todo>>(
+        queryKey: new("todos"),
+        queryFn: async ctx => await FetchTodosAsync()
+    ),
+    queryClient
 );
 
-var notifications = await QueryClient.UseQuery(
-    new QueryKey("notifications"),
-    FetchNotifications
+var notificationsQuery = new UseQuery<List<Notification>>(
+    new QueryOptions<List<Notification>>(
+        queryKey: new("notifications"),
+        queryFn: async ctx => await FetchNotificationsAsync()
+    ),
+    queryClient
 );
 
-var settings = await QueryClient.UseQuery(
-    new QueryKey("settings"),
-    FetchSettings
+var settingsQuery = new UseQuery<Settings>(
+    new QueryOptions<Settings>(
+        queryKey: new("settings"),
+        queryFn: async ctx => await FetchSettingsAsync()
+    ),
+    queryClient
 );
 ```
 
@@ -77,15 +95,15 @@ This way, only affected components re-render when their specific data changes.
 
 ```csharp
 @code {
-    private UseQueryResult<Product[]>? Products;
-    private Dictionary<int, int> categoryCount = new();
-    private string[] previousData;
+    private UseQuery<List<Product>>? _productsQuery;
+    private Dictionary<int, int> _categoryCount = new();
+    private List<Product>? _previousData;
 
     protected override bool ShouldRender()
     {
-        if (previousData != Products?.Data)
+        if (_previousData != _productsQuery?.Data)
         {
-            previousData = Products?.Data;
+            _previousData = _productsQuery?.Data;
             RecomputeCategoryCount();
             return true;
         }
@@ -94,14 +112,14 @@ This way, only affected components re-render when their specific data changes.
 
     private void RecomputeCategoryCount()
     {
-        categoryCount.Clear();
-        if (Products?.Data != null)
+        _categoryCount.Clear();
+        if (_productsQuery?.Data != null)
         {
-            foreach (var product in Products.Data)
+            foreach (var product in _productsQuery.Data)
             {
-                if (!categoryCount.ContainsKey(product.CategoryId))
-                    categoryCount[product.CategoryId] = 0;
-                categoryCount[product.CategoryId]++;
+                if (!_categoryCount.ContainsKey(product.CategoryId))
+                    _categoryCount[product.CategoryId] = 0;
+                _categoryCount[product.CategoryId]++;
             }
         }
     }
@@ -115,9 +133,9 @@ This way, only affected components re-render when their specific data changes.
 ```csharp
 @page "/large-list"
 @inject QueryClient QueryClient
-@implements IAsyncDisposable
+@implements IDisposable
 
-<Virtualize Items="Products?.Data?.ToList()" Context="product">
+<Virtualize Items="_productsQuery?.Data" Context="product">
     <ItemContent>
         <div class="product-row">@product.Name</div>
     </ItemContent>
@@ -127,26 +145,33 @@ This way, only affected components re-render when their specific data changes.
 </Virtualize>
 
 @code {
-    private UseQueryResult<Product[]>? Products;
+    private UseQuery<List<Product>>? _productsQuery;
 
     protected override async Task OnInitializedAsync()
     {
-        Products = await QueryClient.UseQuery(
-            queryKey: new QueryKey("products"),
-            queryFn: FetchProducts
+        _productsQuery = new UseQuery<List<Product>>(
+            new QueryOptions<List<Product>>(
+                queryKey: new("products"),
+                queryFn: async ctx => {
+                    return await Http.GetFromJsonAsync<List<Product>>(
+                        "/api/products", ctx.Signal
+                    ) ?? new List<Product>();
+                }
+            ),
+            QueryClient
         );
+
+        _productsQuery.OnChange += StateHasChanged;
+        await _productsQuery.ExecuteAsync();
     }
 
-    private async Task<Product[]> FetchProducts(QueryFunctionContext ctx)
+    public void Dispose()
     {
-        return await Http.GetFromJsonAsync<Product[]>("/api/products", ctx.Signal) 
-            ?? Array.Empty<Product>();
-    }
-
-    async ValueTask IAsyncDisposable.DisposeAsync()
-    {
-        if (Products != null)
-            await Products.DisposeAsync();
+        if (_productsQuery != null)
+        {
+            _productsQuery.OnChange -= StateHasChanged;
+            _productsQuery.Dispose();
+        }
     }
 }
 ```
@@ -156,30 +181,35 @@ This way, only affected components re-render when their specific data changes.
 ### Increase Stale Time
 
 ```csharp
-new QueryOptions
-{
-    // Data stays fresh longer, reducing refetches
-    StaleTime = TimeSpan.FromMinutes(5),
-    
-    // Don't refetch on mount if data is fresh
-    RefetchOnMount = false,
-    
-    // Don't refetch on window focus if fresh
-    RefetchOnWindowFocus = false
-}
+var query = new UseQuery<List<Product>>(
+    new QueryOptions<List<Product>>(
+        queryKey: new("products"),
+        queryFn: async ctx => await FetchProductsAsync(),
+        // Data stays fresh longer, reducing refetches
+        staleTime: TimeSpan.FromMinutes(5),
+        // Don't refetch on window focus if fresh
+        refetchOnWindowFocus: false
+    ),
+    queryClient
+);
 ```
 
 ### Disable Unnecessary Refetching
 
 ```csharp
-new QueryOptions
-{
-    // No automatic refetching
-    RefetchInterval = null,
-    RefetchIntervalInBackground = false,
-    RefetchOnReconnect = false,
-    RefetchOnWindowFocus = false
-}
+var query = new UseQuery<List<Product>>(
+    new QueryOptions<List<Product>>(
+        queryKey: new("products"),
+        queryFn: async ctx => await FetchProductsAsync(),
+        // No automatic polling
+        refetchInterval: null,
+        // No refetch on reconnect
+        refetchOnReconnect: false,
+        // No refetch on window focus
+        refetchOnWindowFocus: false
+    ),
+    queryClient
+);
 ```
 
 ## Best Practices

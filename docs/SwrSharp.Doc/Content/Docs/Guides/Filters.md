@@ -18,31 +18,26 @@ A query filter is an object with certain conditions to match a query with:
 queryClient.InvalidateQueries();
 
 // Invalidate all queries that begin with "posts" in the key
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("posts") 
+queryClient.InvalidateQueries(new QueryFilters
+{
+    QueryKey = new("posts")
 });
 
-// Invalidate all inactive queries that begin with "posts"
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
+// Invalidate with exact match
+queryClient.InvalidateQueries(new QueryFilters
+{
     QueryKey = new("posts"),
-    Type = QueryType.Inactive
+    Exact = true
 });
 
-// Invalidate all active queries
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    Type = QueryType.Active
-});
-
-// Invalidate all stale queries that begin with "posts"
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("posts"),
-    Stale = true
+// Invalidate with custom predicate
+queryClient.InvalidateQueries(new QueryFilters
+{
+    Predicate = key => key.Parts[0]?.ToString() == "posts"
 });
 ```
+
+> **Note**: `Type`, `Stale`, and `FetchStatus` filters exist as properties on `QueryFilters` but are **not yet implemented** in the matching logic. See sections below for details.
 
 A query filter object supports the following properties:
 
@@ -74,16 +69,19 @@ new QueryFilters
 }
 ```
 
-### `Type`
+### `Type` (Not Yet Implemented)
 ```csharp
 public QueryType Type { get; set; } = QueryType.All
 ```
+
+> **Note**: This filter property exists on `QueryFilters` but is **not yet implemented** in the matching logic. Currently, all queries are treated as `QueryType.All` regardless of this setting. Active/Inactive tracking requires observer registration which is planned for a future release.
+
 Defaults to `QueryType.All`
 - When set to `QueryType.Active` it will match active queries (have active observers).
 - When set to `QueryType.Inactive` it will match inactive queries (no active observers).
 - When set to `QueryType.All` it will match all queries.
 
-**Example:**
+**Example (planned behavior):**
 ```csharp
 // Only match active queries
 new QueryFilters { Type = QueryType.Active }
@@ -92,15 +90,18 @@ new QueryFilters { Type = QueryType.Active }
 new QueryFilters { Type = QueryType.Inactive }
 ```
 
-### `Stale`
+### `Stale` (Not Yet Implemented)
 ```csharp
 public bool? Stale { get; set; }
 ```
+
+> **Note**: This filter property exists on `QueryFilters` but is **not yet implemented** in the matching logic. Currently, this setting has no effect. Staleness-based filtering requires access to query state (fetch timestamps and staleTime configuration) which is planned for a future release.
+
 - When set to `true` it will match stale queries.
 - When set to `false` it will match fresh queries.
 - When `null` (default) it will match all queries.
 
-**Example:**
+**Example (planned behavior):**
 ```csharp
 // Only match stale queries
 new QueryFilters { Stale = true }
@@ -109,16 +110,19 @@ new QueryFilters { Stale = true }
 new QueryFilters { Stale = false }
 ```
 
-### `FetchStatus`
+### `FetchStatus` (Not Yet Implemented)
 ```csharp
 public FetchStatus? FetchStatus { get; set; }
 ```
+
+> **Note**: This filter property exists on `QueryFilters` but is **not yet implemented** in the matching logic. Currently, this setting has no effect. FetchStatus-based filtering requires access to active query instances which is planned for a future release.
+
 - When set to `FetchStatus.Fetching` it will match queries that are currently fetching.
 - When set to `FetchStatus.Paused` it will match queries that wanted to fetch, but have been paused.
 - When set to `FetchStatus.Idle` it will match queries that are not fetching.
 - When `null` (default) it will match all queries.
 
-**Example:**
+**Example (planned behavior):**
 ```csharp
 // Only match queries currently fetching
 new QueryFilters { FetchStatus = FetchStatus.Fetching }
@@ -151,8 +155,33 @@ new QueryFilters
 
 ## Combining Filters
 
-You can combine multiple filter properties for precise query matching:
+You can combine multiple filter properties for precise query matching.
 
+> **Note**: Currently only `QueryKey`, `Exact`, and `Predicate` are functional. `Type`, `Stale`, and `FetchStatus` filters are planned for a future release.
+
+**Currently working combinations:**
+```csharp
+// Prefix match with predicate
+queryClient.InvalidateQueries(new QueryFilters
+{
+    QueryKey = new("todos"),
+    Predicate = key => {
+        // Additional custom logic
+        if (key.Parts.Count < 2) return false;
+        var id = key.Parts[1] as int?;
+        return id.HasValue && id.Value > 1000;
+    }
+});
+
+// Exact match
+queryClient.InvalidateQueries(new QueryFilters
+{
+    QueryKey = new("todos"),
+    Exact = true
+});
+```
+
+**Planned combinations (not yet implemented):**
 ```csharp
 // Match active, stale queries starting with "posts"
 queryClient.InvalidateQueries(new QueryFilters
@@ -167,18 +196,6 @@ queryClient.InvalidateQueries(new QueryFilters
 {
     Type = QueryType.Inactive,
     FetchStatus = FetchStatus.Idle
-});
-
-// Complex filtering with predicate
-queryClient.InvalidateQueries(new QueryFilters
-{
-    QueryKey = new("todos"),
-    Stale = true,
-    Predicate = key => {
-        // Additional custom logic
-        var metadata = key.Parts[1];
-        return IsOlderThan(metadata, TimeSpan.FromHours(1));
-    }
 });
 ```
 
@@ -205,9 +222,12 @@ public class BlogService
 }
 ```
 
-### Example 2: Clean Up Inactive Queries
+### Example 2: Clean Up Inactive Queries (Planned)
+
+> **Note**: `QueryType.Active`/`Inactive` filtering is not yet implemented. Currently all queries are treated as matching regardless of this setting.
 
 ```csharp
+// Planned behavior (not yet functional):
 public class CacheManager
 {
     private readonly QueryClient _queryClient;
@@ -233,9 +253,12 @@ public class CacheManager
 }
 ```
 
-### Example 3: Force Refetch Active Queries
+### Example 3: Force Refetch Active Queries (Planned)
+
+> **Note**: `QueryType.Active` filtering is not yet implemented.
 
 ```csharp
+// Planned behavior (not yet functional):
 public class DataSyncService
 {
     private readonly QueryClient _queryClient;
@@ -305,33 +328,22 @@ public class AdvancedQueryManager
 
 ## Filter Matching Logic
 
-The matching process follows these steps:
+The matching process currently follows these steps:
 
-1. **QueryKey Matching**: If `QueryKey` is specified:
+1. **Predicate** (if specified): Custom predicate is evaluated first and takes full control of matching.
+
+2. **QueryKey Matching** (if no Predicate): If `QueryKey` is specified:
    - If `Exact = true`: Must match exactly
-   - If `Exact = false` (default): Prefix matching
+   - If `Exact = false` (default): Prefix matching via `StartsWith`
 
-2. **Type Filtering**: If `Type` is specified:
-   - `Active`: Query must have active observers
-   - `Inactive`: Query must have no active observers
-   - `All` (default): No filtering
+3. **No QueryKey**: If no `QueryKey` is specified and no `Predicate`, matches all queries.
 
-3. **Staleness Filtering**: If `Stale` is specified:
-   - `true`: Query must be stale
-   - `false`: Query must be fresh
-   - `null` (default): No filtering
-
-4. **FetchStatus Filtering**: If `FetchStatus` is specified:
-   - `Fetching`: Query must be currently fetching
-   - `Paused`: Query must be paused
-   - `Idle`: Query must be idle
-   - `null` (default): No filtering
-
-5. **Predicate**: If `Predicate` is specified:
-   - Called as final filter on all queries that passed previous filters
-   - Must return `true` to match
-
-All filters are combined with **AND** logic - a query must satisfy ALL specified conditions to match.
+> **Not yet implemented**: The following filter steps are planned for a future release:
+> - **Type Filtering** (`Active`/`Inactive`/`All`) - requires observer tracking
+> - **Staleness Filtering** (`Stale = true/false`) - requires access to query fetch timestamps
+> - **FetchStatus Filtering** (`Fetching`/`Paused`/`Idle`) - requires access to active query instances
+>
+> When implemented, all filters will be combined with **AND** logic - a query must satisfy ALL specified conditions to match.
 
 ## Comparison with React Query
 
@@ -361,27 +373,13 @@ queryClient.invalidateQueries({
 
 ### SwrSharp (C#):
 ```csharp
-// Remove inactive posts queries
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-  QueryKey = new("posts"),
-  Type = QueryType.Inactive
-});
-
-// Invalidate active queries
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-  Type = QueryType.Active
-});
-
-// Filter by fetch status
+// Prefix match (working)
 queryClient.InvalidateQueries(new QueryFilters
 {
-  QueryKey = new("posts"),
-  FetchStatus = FetchStatus.Idle
+  QueryKey = new("posts")
 });
 
-// Custom predicate
+// Custom predicate (working)
 queryClient.InvalidateQueries(new QueryFilters
 {
   Predicate = key => {
@@ -390,4 +388,11 @@ queryClient.InvalidateQueries(new QueryFilters
     return true;
   }
 });
+
+// Type/Stale/FetchStatus filters (not yet implemented):
+// queryClient.InvalidateQueries(new QueryFilters
+// {
+//   QueryKey = new("posts"),
+//   Type = QueryType.Inactive
+// });
 ```

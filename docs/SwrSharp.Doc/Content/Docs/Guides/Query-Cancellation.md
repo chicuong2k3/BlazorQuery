@@ -254,14 +254,21 @@ public class TodosComponent : IDisposable
 
 Cancel options are used to control the behavior of query cancellation operations.
 
+> **Note**: The `CancelOptions` class exists with `Silent` and `Revert` properties, but their behavior is **not yet implemented**. Currently, `CancelQueries` simply cancels the in-flight fetch via `CancellationToken` without checking these options. Full support for `Silent` and `Revert` is planned for a future release.
+
 ```csharp
-// Cancel specific queries silently
+// Cancel specific queries
 queryClient.CancelQueries(
-    new QueryFilters { QueryKey = new("posts") }, 
+    new QueryFilters { QueryKey = new("posts") }
+);
+
+// Cancel with options (planned behavior - not yet functional)
+queryClient.CancelQueries(
+    new QueryFilters { QueryKey = new("posts") },
     new CancelOptions { Silent = true }
 );
 
-// Cancel without reverting state
+// Cancel without reverting state (planned behavior - not yet functional)
 queryClient.CancelQueries(
     new QueryFilters { QueryKey = new("todos") },
     new CancelOptions { Revert = false }
@@ -270,19 +277,21 @@ queryClient.CancelQueries(
 
 A `CancelOptions` object supports the following properties:
 
-### `Silent`
+### `Silent` (Not Yet Implemented)
 ```csharp
 public bool Silent { get; set; } = false
 ```
-- When set to `true`, suppresses propagation of `OperationCanceledException` to observers (e.g., `OnError` callbacks) and related notifications.
+- **Planned behavior**: When set to `true`, suppresses propagation of `OperationCanceledException` to observers (e.g., `OnError` callbacks) and related notifications.
 - Defaults to `false`
+- Currently has no effect.
 
-### `Revert`
+### `Revert` (Not Yet Implemented)
 ```csharp
 public bool Revert { get; set; } = true
 ```
-- When set to `true`, restores the query's state (data and status) from immediately before the in-flight fetch, sets `FetchStatus` back to `Idle`, and only throws if there was no prior data.
+- **Planned behavior**: When set to `true`, restores the query's state (data and status) from immediately before the in-flight fetch, sets `FetchStatus` back to `Idle`, and only throws if there was no prior data.
 - Defaults to `true`
+- Currently has no effect.
 
 ## Advanced Examples
 
@@ -441,10 +450,13 @@ private void OnCancelClick()
 // Users stuck waiting for long request
 ```
 
-### 4. **Consider Silent Mode for Background Queries**
+### 4. **Consider Silent Mode for Background Queries (Planned)**
+
+> **Note**: `Silent` option is not yet implemented. Currently all cancellations behave the same way.
 
 ```csharp
-// ✅ Good: Silent cancellation for background work
+// Planned behavior:
+// Silent cancellation for background work
 queryClient.CancelQueries(
     new QueryFilters { QueryKey = new("backgroundSync") },
     new CancelOptions { Silent = true }
@@ -498,7 +510,7 @@ var query = new UseQuery<List<Todo>>(
 // Manual cancellation
 queryClient.CancelQueries(new QueryFilters { QueryKey = new("todos") });
 
-// With options
+// With options (Silent/Revert not yet implemented)
 queryClient.CancelQueries(
     new QueryFilters { QueryKey = new("posts") },
     new CancelOptions { Silent = true }

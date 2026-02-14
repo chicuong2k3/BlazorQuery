@@ -10,17 +10,17 @@ Security is critical when working with data fetching and caching. Follow these b
 ## Authentication & Authorization
 ### Secure Query Functions
 ```csharp
-private async Task<Todo[]> FetchUserTodos(QueryFunctionContext ctx)
+private async Task<List<Todo>> FetchUserTodos(QueryFunctionContext ctx)
 {
     // Only fetch data for the current user
     var userId = await GetCurrentUserIdAsync();
     if (userId == null)
         throw new UnauthorizedAccessException("User not authenticated");
-    var todos = await Http.GetFromJsonAsync<Todo[]>(
-        $"/api/users/{userId}/todos", 
+    var todos = await Http.GetFromJsonAsync<List<Todo>>(
+        $"/api/users/{userId}/todos",
         ctx.Signal
     );
-    return todos ?? Array.Empty<Todo>();
+    return todos ?? new List<Todo>();
 }
 ```
 ### Include Authentication Headers
@@ -29,32 +29,30 @@ private async Task<Todo[]> FetchUserTodos(QueryFunctionContext ctx)
 builder.Services.AddScoped(sp =>
 {
     var client = new HttpClient { BaseAddress = new Uri("https://api.example.com") };
-    client.DefaultRequestHeaders.Authorization = 
+    client.DefaultRequestHeaders.Authorization =
         new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
     return client;
 });
 ```
 ## Cache Security
-### Don't Cache Sensitive Data
+### Don't Cache Sensitive Data Too Long
 ```csharp
-var query = await QueryClient.UseQuery(
-    queryKey: new QueryKey("user-profile"),
-    queryFn: FetchUserProfile,
-    options: new QueryOptions
-    {
+var query = new UseQuery<UserProfile>(
+    new QueryOptions<UserProfile>(
+        queryKey: new("user-profile"),
+        queryFn: async ctx => await FetchUserProfileAsync(ctx.Signal),
         // Don't cache sensitive data for long
-        StaleTime = TimeSpan.FromSeconds(30),
-        // Enable garbage collection quickly
-        GcTime = TimeSpan.FromMinutes(1)
-    }
+        staleTime: TimeSpan.FromSeconds(30)
+    ),
+    queryClient
 );
 ```
 ### Clear Cache on Logout
 ```csharp
-private async Task LogoutAsync()
+private void Logout()
 {
-    // Clear all cached data when user logs out
-    await QueryClient.ClearCache();
+    // Dispose the QueryClient to clear all cached data
+    queryClient.Dispose();
     // Navigate to login
     NavigationManager.NavigateTo("/login");
 }
@@ -62,70 +60,87 @@ private async Task LogoutAsync()
 ## Input Validation
 ### Validate Query Parameters
 ```csharp
-private async Task<Product> FetchProduct(QueryFunctionContext ctx)
-{
-    var (queryKey, signal) = ctx;
-    var productId = (int?)queryKey[1];
-    // Validate input
-    if (productId == null || productId <= 0)
-        throw new ArgumentException("Invalid product ID");
-    return await Http.GetFromJsonAsync<Product>(
-        $"/api/products/{productId}", 
-        signal
-    ) ?? throw new InvalidOperationException("Product not found");
-}
+var query = new UseQuery<Product>(
+    new QueryOptions<Product>(
+        queryKey: new("product", productId),
+        queryFn: async ctx => {
+            var (queryKey, signal) = ctx;
+            var id = (int?)queryKey[1];
+            // Validate input
+            if (id == null || id <= 0)
+                throw new ArgumentException("Invalid product ID");
+            return await Http.GetFromJsonAsync<Product>(
+                $"/api/products/{id}",
+                signal
+            ) ?? throw new InvalidOperationException("Product not found");
+        }
+    ),
+    queryClient
+);
 ```
 ## Rate Limiting
 ### Implement Request Throttling
 ```csharp
-public class RateLimitedQueryClient
+public class RateLimitedFetcher
 {
-    private readonly QueryClient queryClient;
-    private readonly SemaphoreSlim semaphore;
-    private readonly int maxRequests;
-    private readonly TimeSpan timeWindow;
-    public RateLimitedQueryClient(QueryClient queryClient, int maxRequests = 10, TimeSpan? timeWindow = null)
+    private readonly SemaphoreSlim _semaphore;
+    private readonly TimeSpan _timeWindow;
+
+    public RateLimitedFetcher(int maxRequests = 10, TimeSpan? timeWindow = null)
     {
-        this.queryClient = queryClient;
-        this.maxRequests = maxRequests;
-        this.timeWindow = timeWindow ?? TimeSpan.FromSeconds(1);
-        this.semaphore = new SemaphoreSlim(maxRequests, maxRequests);
+        _semaphore = new SemaphoreSlim(maxRequests, maxRequests);
+        _timeWindow = timeWindow ?? TimeSpan.FromSeconds(1);
     }
-    public async Task<T> UseQueryWithRateLimit<T>(QueryKey key, Func<QueryFunctionContext, Task<T>> fn)
+
+    public async Task<T> FetchWithRateLimitAsync<T>(Func<Task<T>> fetchFn)
     {
-        await semaphore.WaitAsync();
+        await _semaphore.WaitAsync();
         try
         {
-            return await queryClient.UseQuery(key, fn);
+            return await fetchFn();
         }
         finally
         {
-            _ = Task.Delay(timeWindow).ContinueWith(_ => semaphore.Release());
+            _ = Task.Delay(_timeWindow).ContinueWith(_ => _semaphore.Release());
         }
     }
 }
+
+// Usage in query function:
+var rateLimiter = new RateLimitedFetcher(maxRequests: 10);
+
+var query = new UseQuery<List<Product>>(
+    new QueryOptions<List<Product>>(
+        queryKey: new("products"),
+        queryFn: async ctx => await rateLimiter.FetchWithRateLimitAsync(
+            () => Http.GetFromJsonAsync<List<Product>>("/api/products", ctx.Signal)
+                  ?? Task.FromResult(new List<Product>())
+        )
+    ),
+    queryClient
+);
 ```
 ## Error Information Disclosure
 ### Don't Expose Sensitive Errors
 ```csharp
-@if (Query?.IsError ?? false)
+@if (_query?.IsError ?? false)
 {
     <div class="error-alert">
         <!-- Show generic message to users -->
         <p>An error occurred while loading data. Please try again later.</p>
         <!-- Only show detailed errors in development -->
-        @if (isDevelopment)
+        @if (_isDevelopment)
         {
             <details>
                 <summary>Error Details</summary>
-                <pre>@Query.Error?.Message</pre>
+                <pre>@_query.Error?.Message</pre>
             </details>
         }
     </div>
 }
 @code {
     @inject IWebHostEnvironment Environment
-    private bool isDevelopment => Environment.IsDevelopment();
+    private bool _isDevelopment => Environment.IsDevelopment();
 }
 ```
 ## HTTPS Only
@@ -150,7 +165,7 @@ app.Use(async (context, next) =>
 // In Program.cs
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.Add("Content-Security-Policy", 
+    context.Response.Headers.Add("Content-Security-Policy",
         "default-src 'self'; script-src 'self' 'unsafe-inline'");
     context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
     context.Response.Headers.Add("X-Frame-Options", "DENY");
@@ -161,14 +176,21 @@ app.Use(async (context, next) =>
 ### Avoid Sensitive Data in Keys
 ```csharp
 // BAD - password in query key
-var query = await QueryClient.UseQuery(
-    queryKey: new QueryKey("user-login", email, password), // ✗ Don't do this!
-    queryFn: Login
+var query = new UseQuery<User>(
+    new QueryOptions<User>(
+        queryKey: new("user-login", email, password), // Don't do this!
+        queryFn: async ctx => await LoginAsync(email, password)
+    ),
+    queryClient
 );
+
 // GOOD - use token/session instead
-var query = await QueryClient.UseQuery(
-    queryKey: new QueryKey("user-profile"),
-    queryFn: FetchProfile // Uses authentication token from HttpClient
+var query = new UseQuery<UserProfile>(
+    new QueryOptions<UserProfile>(
+        queryKey: new("user-profile"),
+        queryFn: async ctx => await FetchProfileAsync(ctx.Signal) // Uses auth token from HttpClient
+    ),
+    queryClient
 );
 ```
 ## Best Practices Checklist
