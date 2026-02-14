@@ -9,6 +9,8 @@ category: "Guides"
 
 If a user leaves your application and returns and the query data is stale, **SwrSharp automatically requests fresh data for you in the background**. You can disable this globally or per-query using the `refetchOnWindowFocus` option.
 
+> Note: SwrSharp follows the React Query behavior and terminology where `staleTime: 0` means the data is immediately stale (i.e. "always stale"). See the React Query docs for the canonical behavior: https://tanstack.com/query/latest/docs
+
 ## Basic Usage
 
 ### Disabling Per-Query
@@ -32,6 +34,8 @@ var queryClient = new QueryClient()
     DefaultRefetchOnWindowFocus = false // Disable for all queries
 };
 ```
+
+> Important: At the moment SwrSharp's `QueryOptions` constructor sets `refetchOnWindowFocus` to `true` by default. That means an individual query will still opt-in to focus refetching unless you explicitly set `refetchOnWindowFocus: false` on the `QueryOptions` instance. The `QueryClient.DefaultRefetchOnWindowFocus` field exists to allow libraries and higher-level code to store a global preference, but code must explicitly opt into using that global value. If you want your queries to inherit the client's global default, set the per-query option accordingly or consider wrapping `QueryOptions` construction to read `QueryClient.DefaultRefetchOnWindowFocus`.
 
 ## How It Works
 

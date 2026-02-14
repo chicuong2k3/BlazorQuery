@@ -251,10 +251,10 @@ public class DependentQueriesTests : IDisposable
     }
 
     [Fact]
-    public async Task DependentQuery_ShouldNotRefetchWhenStillDisabled()
+    public async Task DependentQuery_ShouldNotExecuteWhenDisabled_ButRefetchBypassesEnabled()
     {
         var fetchCount = 0;
-        
+
         var query = new UseQuery<string>(
             new QueryOptions<string>(
                 queryKey: new QueryKey("dependent"),
@@ -268,13 +268,14 @@ public class DependentQueriesTests : IDisposable
             _client
         );
 
-        // Multiple execute attempts
+        // ExecuteAsync respects enabled=false
         await query.ExecuteAsync();
         await query.ExecuteAsync();
-        await query.RefetchAsync();
-
-        // Should never execute
         Assert.Equal(0, fetchCount);
+
+        // RefetchAsync bypasses enabled check (matches React Query behavior)
+        await query.RefetchAsync();
+        Assert.Equal(1, fetchCount);
     }
 
     [Fact]

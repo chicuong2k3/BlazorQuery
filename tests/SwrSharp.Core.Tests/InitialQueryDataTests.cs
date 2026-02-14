@@ -260,6 +260,17 @@ public class InitialQueryDataTests : IDisposable
         Assert.Equal("Lazy Initial", query.Data);
 
         // Creating another query should call function again
+        var query2 = new UseQuery<string>(
+            new QueryOptions<string>(
+                queryKey: new QueryKey("data2"),
+                queryFn: _ => Task.FromResult("Fetched"),
+                initialDataFunc: () => {
+                    funcCallCount++;
+                    return "Lazy Initial 2";
+                }
+            ),
+            _client
+        );
 
         Assert.Equal(2, funcCallCount);
     }

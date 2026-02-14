@@ -98,23 +98,23 @@ var query = new UseQuery<List<Todo>>(
 
 ## Garbage Collection
 
-- Query results that have no more active instances of `UseQuery`, `UseInfiniteQuery` are labeled as "inactive" and remain in the cache in case they are used again at a later time.
-- By default, "inactive" queries are garbage collected after **5 minutes**.
+- In React Query, query results that have no more active observers are labeled as "inactive" and remain in the cache for **5 minutes** (default `gcTime`) before being garbage collected.
+- **SwrSharp does not yet implement automatic garbage collection**. Cache entries persist until manually removed.
 
 ```csharp
-// Default gcTime: 5 minutes
-// Data stays in cache for 5 minutes after last UseQuery instance is disposed
-
-// Example: User navigates away from page
+// SwrSharp: Cache entries persist until manually removed
 var query = new UseQuery<List<Todo>>(...);
 await query.ExecuteAsync();
-query.Dispose(); // Query becomes "inactive"
+query.Dispose(); // Query instance disposed, but cache entry remains in QueryClient
 
-// 5 minutes later: cache is automatically cleared
-// If user returns before 5 minutes: data is still available!
+// To manually remove cached data:
+queryClient.Invalidate(new QueryKey("todos"));
+
+// Cache is also cleared when QueryClient is disposed:
+queryClient.Dispose();
 ```
 
-> **Note**: SwrSharp's garbage collection is currently manual - you must explicitly call `Dispose()` on queries and `QueryClient.Invalidate()` to remove cached data. Automatic time-based GC with configurable `gcTime` is planned for future releases.
+> **Note**: Automatic time-based GC with configurable `gcTime` is planned for future releases. For now, you must explicitly manage cache cleanup via `QueryClient.Invalidate()` or `QueryClient.Dispose()`.
 
 ## Retry Behavior
 
@@ -192,13 +192,13 @@ await query.RefetchAsync(); // Refetch
 | `refetchOnWindowFocus` | `true` | Refetch when window gains focus |
 | `refetchOnReconnect` | `true` | Refetch when network reconnects |
 | `refetchInterval` | `null` | No automatic polling |
-| `gcTime` | N/A* | Manual cleanup via Dispose() |
+| `gcTime` | N/A* | Not yet implemented (manual cleanup) |
 | `retry` | `3` | Retry 3 times after initial attempt |
 | `retryDelay` | Exponential | `Math.Min(1000 * 2^attempt, 30000)` |
 | `enabled` | `true` | Query executes automatically |
 | `networkMode` | `Online` | Pause when offline |
 
-*Automatic GC planned for future release
+*Automatic GC with configurable `gcTime` planned for future release
 
 ## Common Pitfalls
 

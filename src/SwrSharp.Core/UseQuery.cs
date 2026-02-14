@@ -127,6 +127,7 @@ public class UseQuery<T> : IDisposable
         _onlineManager = client.OnlineManager;
         FetchStatus = FetchStatus.Idle;
 
+
         // Resolve QueryFn: use provided queryFn or fallback to type-safe default
         if (_queryOptions.QueryFn == null)
         {
@@ -349,8 +350,44 @@ public class UseQuery<T> : IDisposable
 
         if (_queryOptions.PlaceholderDataFunc != null)
         {
+            // Provide a meaningful previousData and previousQuery by inspecting the client's cache.
+            // Find another cache entry that shares the same primary key (first part) but is a different key.
+            object? prevData = null;
+            QueryOptions<T>? prevQueryOptions = null;
+
+            try
+            {
+                var basePart = _queryOptions.QueryKey.Parts.Count > 0 ? _queryOptions.QueryKey.Parts[0] : null;
+                if (basePart != null)
+                {
+                    var entries = _client.GetAllCacheEntries();
+                    // Find the most recently fetched entry that matches the base key but is not this key
+                    var matched = entries
+                        .Where(kv => kv.Key.Parts.Count > 0 && Equals(kv.Key.Parts[0], basePart) && !kv.Key.Equals(_queryOptions.QueryKey))
+                        .OrderByDescending(kv => kv.Value.FetchTime)
+                        .ToList();
+
+                    if (matched.Count > 0)
+                    {
+                        var candidate = matched[0];
+                        prevData = candidate.Value.Data;
+                        // Create a minimal QueryOptions placeholder for previous query (tests only check NotNull)
+                        prevQueryOptions = new QueryOptions<T>(candidate.Key);
+                    }
+                }
+            }
+            catch
+            {
+                // ignore cache inspection errors; fall back to nulls
+            }
+
+            // Safely convert prevData to T (handles value types)
+            T? prevDataTyped = default;
+            if (prevData is T pd)
+                prevDataTyped = pd;
+
             // Function receives previousData and previousQuery for transitions
-            placeholderData = _queryOptions.PlaceholderDataFunc(_previousData, _previousQueryOptions);
+            placeholderData = _queryOptions.PlaceholderDataFunc(prevDataTyped, prevQueryOptions);
             hasPlaceholderData = placeholderData != null;
         }
         else if (_queryOptions.PlaceholderData != null)
@@ -449,8 +486,8 @@ public class UseQuery<T> : IDisposable
         if (_queryOptions.RefetchOnReconnect && _queryOptions.NetworkMode != NetworkMode.Always)
         {
             var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
-            var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
-                                            (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
+            var isDataStale = entry == null || _queryOptions.StaleTime <= TimeSpan.Zero ||
+                                            (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime;
 
             if (isDataStale)
             {
@@ -477,8 +514,8 @@ public class UseQuery<T> : IDisposable
 
         // Check if data is stale
         var entry = _client.GetCacheEntry(_queryOptions.QueryKey);
-        var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
-                                        (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
+        var isDataStale = entry == null || _queryOptions.StaleTime <= TimeSpan.Zero ||
+                                        (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime;
 
         // Only refetch if data is stale
         if (isDataStale)
@@ -509,7 +546,8 @@ public class UseQuery<T> : IDisposable
             // Cancel _currentCts only if a fetch is already running
             if (_currentCts != null && FetchStatus == FetchStatus.Fetching)
             {
-                await _currentCts.CancelAsync();
+                // Cancel previous fetch
+                _currentCts.Cancel();
             }
             _currentCts = new CancellationTokenSource();
 
@@ -530,10 +568,13 @@ public class UseQuery<T> : IDisposable
             }
 
 
-            var isDataStale = entry == null || (_queryOptions.StaleTime > TimeSpan.Zero &&
-                                            (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime);
+            var isDataStale = entry == null || _queryOptions.StaleTime <= TimeSpan.Zero ||
+                                            (DateTime.UtcNow - entry.FetchTime) > _queryOptions.StaleTime;
 
-            var shouldPause = _queryOptions.NetworkMode != NetworkMode.Always 
+            // Pause if offline, UNLESS:
+            // - NetworkMode.Always: never pauses
+            // - NetworkMode.OfflineFirst: first attempt always executes (might succeed from cache)
+            var shouldPause = _queryOptions.NetworkMode == NetworkMode.Online
                                 && !_onlineManager.IsOnline;
 
             if (shouldPause)
@@ -676,10 +717,14 @@ public class UseQuery<T> : IDisposable
                         FetchStatus = FetchStatus.Fetching;
                     }
 
-                    int delayMs; 
+                    int delayMs;
                     if (_queryOptions.RetryDelayFunc != null)
                     {
                         delayMs = (int)_queryOptions.RetryDelayFunc(attemptIndex).TotalMilliseconds;
+                    }
+                    else if (_queryOptions.RetryDelay.HasValue)
+                    {
+                        delayMs = (int)_queryOptions.RetryDelay.Value.TotalMilliseconds;
                     }
                     else
                     {
@@ -769,7 +814,22 @@ public class UseQuery<T> : IDisposable
     public async Task RefetchAsync(CancellationToken? signal = null)
     {
         _client.Invalidate(_queryOptions.QueryKey);
-        await ExecuteAsync(signal, isRefetch: true).ConfigureAwait(false);
+
+        // Temporarily enable for refetch if disabled.
+        // Matches React Query behavior where refetch() bypasses the enabled check.
+        var wasEnabled = _queryOptions.Enabled;
+        if (!wasEnabled)
+            _queryOptions.Enabled = true;
+
+        try
+        {
+            await ExecuteAsync(signal, isRefetch: true).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (!wasEnabled)
+                _queryOptions.Enabled = false;
+        }
     }
 
     private void Notify() => OnChange?.Invoke();

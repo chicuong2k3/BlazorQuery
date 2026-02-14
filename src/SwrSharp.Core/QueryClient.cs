@@ -146,6 +146,12 @@ public class QueryClient : IDisposable
             entry.FetchTime = now;
             return result!;
         }
+        catch (OperationCanceledException)
+        {
+            // Don't persist cancellation as an error in the cache. Throw an exact OperationCanceledException
+            entry.Error = null;
+            throw new OperationCanceledException(signal ?? CancellationToken.None);
+        }
         catch (Exception ex)
         {
             entry.Error = ex;
@@ -380,5 +386,15 @@ public class QueryClient : IDisposable
     public void Dispose()
     {
         _cache.Clear();
+    }
+
+    /// <summary>
+    /// Internal helper: returns a snapshot of the cache entries.
+    /// Used by UseQuery to inspect existing cached data (e.g. placeholder transitions).
+    /// </summary>
+    internal IReadOnlyList<KeyValuePair<QueryKey, CacheEntry>> GetAllCacheEntries()
+    {
+        // Return a snapshot to avoid exposing internal mutable dictionary
+        return _cache.ToArray();
     }
 }

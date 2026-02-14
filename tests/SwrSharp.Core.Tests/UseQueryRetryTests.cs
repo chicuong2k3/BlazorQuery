@@ -32,7 +32,7 @@ public class UseQueryRetryTests : UseQueryTestsBase
         var tcs = new TaskCompletionSource<List<string>>();
 
         var query = CreateQuery(
-            NetworkMode.Online,
+            NetworkMode.Always,
             async _ =>
             {
                 count++;
@@ -42,7 +42,6 @@ public class UseQueryRetryTests : UseQueryTestsBase
             retryInfinite: true
         );
 
-        SetOnline(true);
         var snapshots = await ObserveQuery(query);
         Assert.Equal(5, count);
         Assert.Equal(QueryStatus.Success, snapshots[^1].Status);
@@ -77,7 +76,7 @@ public class UseQueryRetryTests : UseQueryTestsBase
         int count = 0;
         var timestamps = new List<DateTime>();
         var query = CreateQuery<List<string>>(
-            NetworkMode.Online,
+            NetworkMode.Always,
             async _ =>
             {
                 timestamps.Add(DateTime.UtcNow);
@@ -88,7 +87,6 @@ public class UseQueryRetryTests : UseQueryTestsBase
             retryDelayFunc: attempt => TimeSpan.FromMilliseconds(50)
         );
 
-        SetOnline(true);
         var snapshots = await ObserveQuery(query);
         Assert.Equal(4, count);
         Assert.True((timestamps[1] - timestamps[0]).TotalMilliseconds >= 50);

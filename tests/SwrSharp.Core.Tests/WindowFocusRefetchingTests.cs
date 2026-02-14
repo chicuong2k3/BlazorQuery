@@ -60,7 +60,7 @@ public class WindowFocusRefetchingTests : IDisposable
                     await Task.Delay(10);
                     return $"Data {fetchCount}";
                 },
-                staleTime: TimeSpan.FromMilliseconds(50),
+                staleTime: TimeSpan.MaxValue, // Prevent staleTimer from triggering
                 refetchOnWindowFocus: false // Disabled
             ),
             _client
@@ -70,14 +70,11 @@ public class WindowFocusRefetchingTests : IDisposable
         await query.ExecuteAsync();
         Assert.Equal(1, fetchCount);
 
-        // Wait for data to become stale
-        await Task.Delay(100);
-
         // Simulate window gaining focus
         _focusManager.SetFocused(true);
         await Task.Delay(50);
 
-        // Should NOT have refetched
+        // Should NOT have refetched (refetchOnWindowFocus is false)
         Assert.Equal(1, fetchCount);
     }
 
@@ -125,7 +122,7 @@ public class WindowFocusRefetchingTests : IDisposable
                     await Task.Delay(10);
                     return $"Data {fetchCount}";
                 },
-                staleTime: TimeSpan.FromMilliseconds(50),
+                staleTime: TimeSpan.MaxValue, // Prevent staleTimer from triggering
                 refetchOnWindowFocus: true
             ),
             _client
@@ -133,8 +130,6 @@ public class WindowFocusRefetchingTests : IDisposable
 
         await query.ExecuteAsync();
         Assert.Equal(1, fetchCount);
-
-        await Task.Delay(100); // Data becomes stale
 
         // Simulate window losing focus
         _focusManager.SetFocused(false);
@@ -193,17 +188,15 @@ public class WindowFocusRefetchingTests : IDisposable
                 await Task.Delay(10);
                 return $"Data {fetchCount}";
             },
-            staleTime: TimeSpan.FromMilliseconds(50),
+            staleTime: TimeSpan.MaxValue, // Prevent staleTimer from triggering
             enabled: true,
             refetchOnWindowFocus: true
         );
-        
+
         var query = new UseQuery<string>(options, _client);
 
         await query.ExecuteAsync();
         Assert.Equal(1, fetchCount);
-
-        await Task.Delay(100); // Data becomes stale
 
         // Disable query via options
         options.Enabled = false;

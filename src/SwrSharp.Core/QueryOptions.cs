@@ -64,7 +64,7 @@ public class QueryOptions<T>
     public IReadOnlyDictionary<string, object>? Meta { get; init; }
     public bool Enabled { get; set; } = true;
     public bool RefetchOnWindowFocus { get; set; } = true;
-    
+
     /// <summary>
     /// Initial data to prepopulate the query cache.
     /// This data is persisted to cache and treated as fresh.

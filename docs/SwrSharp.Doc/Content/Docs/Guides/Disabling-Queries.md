@@ -16,7 +16,7 @@ When `enabled` is `false`:
 - The query will not automatically fetch on mount.
 - The query will not automatically refetch in the background.
 - The query will ignore query client `Invalidate` and `Refetch` calls that would normally result in the query refetching.
-- `RefetchAsync()` returned from `UseQuery` can be used to manually trigger the query to fetch by temporarily enabling it.
+- `RefetchAsync()` returned from `UseQuery` can be used to manually trigger the query to fetch. It bypasses the `enabled` check, matching React Query's behavior.
 
 ## Basic Usage
 
@@ -45,10 +45,8 @@ public class TodosComponent
     {
         if (_todosQuery == null) return;
 
-        // Temporarily enable and fetch
-        _todosQuery.Options.Enabled = true;
+        // RefetchAsync bypasses the enabled check
         await _todosQuery.RefetchAsync();
-        _todosQuery.Options.Enabled = false; // Optional: disable again
     }
 
     private void RenderUI()
@@ -288,7 +286,7 @@ Console.WriteLine(query.Data);    // <cached data>
 
 ## Ignore Invalidations When Disabled
 
-When a query is disabled, it will ignore `Invalidate` and `Refetch` calls:
+When a query is disabled, it will ignore `InvalidateQueries` calls from the `QueryClient`. However, `RefetchAsync()` called directly on the query instance will still work:
 
 ```csharp
 var query = new UseQuery<Data>(
@@ -301,14 +299,10 @@ var query = new UseQuery<Data>(
 );
 
 // This won't trigger a fetch (query is disabled)
-queryClient.Invalidate(new QueryKey("data"));
+queryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("data") });
 
-// This also won't trigger a fetch
-await query.RefetchAsync(); // Returns immediately, no fetch
-
-// To manually fetch, you must enable first
-query.Options.Enabled = true;
-await query.RefetchAsync(); // Now it fetches
+// But RefetchAsync() bypasses the enabled check (matches React Query)
+await query.RefetchAsync(); // This WILL fetch!
 ```
 
 ## Complete Example: Manual Data Loading
@@ -354,19 +348,8 @@ public class DataFetcherComponent : IDisposable
     {
         if (_itemsQuery == null) return;
 
-        // Temporarily enable for manual fetch
-        var wasEnabled = _itemsQuery.Options.Enabled;
-        _itemsQuery.Options.Enabled = true;
-
-        try
-        {
-            await _itemsQuery.RefetchAsync();
-        }
-        finally
-        {
-            // Restore previous state
-            _itemsQuery.Options.Enabled = wasEnabled;
-        }
+        // RefetchAsync bypasses the enabled check
+        await _itemsQuery.RefetchAsync();
     }
 
     public async Task ToggleModeAsync()
