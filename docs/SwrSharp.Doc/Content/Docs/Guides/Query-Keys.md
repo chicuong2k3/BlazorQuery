@@ -101,6 +101,20 @@ new QueryKey("todos", null, 2, "active");
 
 This ensures predictable caching — the same key always resolves to the same cache entry.
 
+# Deterministic caching — what it means
+
+Deterministic caching means the same query key will always map to the same cache entry.
+SwrSharp computes a stable hash from the ordered list of key parts so lookups, invalidation,
+and cache sharing behave predictably across runs and process restarts (subject to the same
+key values). In practice this means:
+
+- Two equal `QueryKey` instances (by value) always point to the same cache entry.
+- The order and values of parts form the cache identity (see "order matters" below).
+- Anonymous objects and records are compared by value (property names sorted, null properties
+  ignored) so they behave predictably as key parts.
+
+This deterministic mapping is central to refetching, cache isolation, and query sharing.
+
 # Include Variables That Affect Fetching
 
 Always include every variable that affects the data being fetched.
