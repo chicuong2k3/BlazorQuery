@@ -201,27 +201,108 @@ var mutation = new UseMutation<Todo, CreateTodoInput>(
 
 During retries, `FailureCount` and `FailureReason` track the current retry state.
 
-## Invalidation from Mutations
+## Invalidations from Mutations
 
-The most common use case for mutations is to invalidate related queries so they refetch with fresh data:
+Invalidating queries is only half the battle. Knowing **when** to invalidate them is the other half. Usually when a mutation in your app succeeds, it's VERY likely that there are related queries in your application that need to be invalidated and possibly refetched to account for the new changes from your mutation.
+
+For example, assume we have a mutation to post a new todo:
 
 ```csharp
 var mutation = new UseMutation<Todo, CreateTodoInput>(
     new MutationOptions<Todo, CreateTodoInput>
     {
-        MutationFn = async input => await CreateTodo(input),
+        MutationFn = async input => await PostTodo(input)
+    },
+    queryClient
+);
+```
+
+When a successful `PostTodo` mutation happens, we likely want all `todos` queries to get invalidated and possibly refetched to show the new todo item. To do this, you can use `UseMutation`'s `OnSuccess` callback and the client's `InvalidateQueries` method:
+
+```csharp
+var mutation = new UseMutation<Todo, CreateTodoInput>(
+    new MutationOptions<Todo, CreateTodoInput>
+    {
+        MutationFn = async input => await AddTodo(input),
         OnSuccess = async (data, variables, onMutateResult, context) =>
         {
-            // Invalidate all todo queries
+            // Invalidate a single query
             context.Client.InvalidateQueries(new QueryFilters
             {
                 QueryKey = new QueryKey("todos")
+            });
+
+            // Or invalidate multiple queries
+            context.Client.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new QueryKey("todos")
+            });
+            context.Client.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new QueryKey("reminders")
             });
         }
     },
     queryClient
 );
 ```
+
+You can wire up your invalidations to happen using any of the callbacks available in `UseMutation` (`OnSuccess`, `OnError`, `OnSettled`).
+
+## Updates from Mutation Responses
+
+When dealing with mutations that **update** objects on the server, it's common for the new object to be automatically returned in the response of the mutation. Instead of refetching any queries for that item and wasting a network call for data we already have, we can take advantage of the object returned by the mutation function and update the existing query with the new data immediately using `QueryClient.SetQueryData`:
+
+```csharp
+var mutation = new UseMutation<Todo, EditTodoInput>(
+    new MutationOptions<Todo, EditTodoInput>
+    {
+        MutationFn = async input => await EditTodo(input),
+        OnSuccess = async (data, variables, onMutateResult, context) =>
+        {
+            context.Client.SetQueryData(
+                new QueryKey("todo", variables.Id),
+                data
+            );
+        }
+    },
+    queryClient
+);
+
+await mutation.MutateAsync(new EditTodoInput { Id = 5, Name = "Do the laundry" });
+
+// The query below will be updated with the response from the
+// successful mutation
+var query = new UseQuery<Todo>(new QueryOptions<Todo>(
+    queryKey: new QueryKey("todo", 5),
+    queryFn: async ctx => await FetchTodoById(5)
+), queryClient);
+```
+
+You might want to tie the `OnSuccess` logic into a reusable mutation. For that you can create a helper method:
+
+```csharp
+UseMutation<Todo, EditTodoInput> CreateEditTodoMutation(QueryClient queryClient)
+{
+    return new UseMutation<Todo, EditTodoInput>(
+        new MutationOptions<Todo, EditTodoInput>
+        {
+            MutationFn = async input => await EditTodo(input),
+            // Notice the second parameter gives you access to the variables
+            OnSuccess = async (data, variables, onMutateResult, context) =>
+            {
+                context.Client.SetQueryData(
+                    new QueryKey("todo", variables.Id),
+                    data
+                );
+            }
+        },
+        queryClient
+    );
+}
+```
+
+> **Immutability**: Updates via `SetQueryData` should be performed in an immutable way. **DO NOT** attempt to mutate cached data in place. Always create new objects or collections when updating the cache.
 
 ## Optimistic Updates
 
@@ -287,3 +368,46 @@ mutation.Mutate(input1);
 mutation.Mutate(input2);
 mutation.Mutate(input3);
 ```
+
+## MutationOptions Reference
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `MutationFn` | `Func<TVariables, Task<TData>>` | **required** | The mutation function |
+| `MutationKey` | `QueryKey?` | `null` | Optional key to identify the mutation |
+| `Retry` | `int` | `0` | Number of retry attempts on failure |
+| `RetryDelay` | `TimeSpan?` | `null` | Fixed delay between retries |
+| `RetryDelayFunc` | `Func<int, TimeSpan>?` | `null` | Custom retry delay function |
+| `MaxRetryDelay` | `TimeSpan?` | 30s | Maximum retry delay (exponential backoff) |
+| `NetworkMode` | `NetworkMode` | `Online` | Network behavior (`Online`, `Always`, `OfflineFirst`) |
+| `Meta` | `IReadOnlyDictionary<string, object>?` | `null` | Arbitrary metadata |
+| `Scope` | `MutationScope?` | `null` | Scope for serial execution |
+| `OnMutate` | `Func<TVariables, MutationContext, Task<object?>>?` | `null` | Called before mutation fires |
+| `OnSuccess` | `Func<TData, TVariables, object?, MutationContext, Task>?` | `null` | Called on success |
+| `OnError` | `Func<Exception, TVariables, object?, MutationContext, Task>?` | `null` | Called on error |
+| `OnSettled` | `Func<TData?, Exception?, TVariables, object?, MutationContext, Task>?` | `null` | Called on success or error |
+
+## UseMutation Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `Data` | `TData?` | Last successfully resolved data |
+| `Error` | `Exception?` | Error from failed mutation |
+| `Variables` | `TVariables?` | Variables from most recent call |
+| `Status` | `MutationStatus` | `Idle`, `Pending`, `Error`, or `Success` |
+| `IsIdle` | `bool` | Mutation is idle (fresh or reset) |
+| `IsPending` | `bool` | Mutation is running |
+| `IsError` | `bool` | Mutation failed |
+| `IsSuccess` | `bool` | Mutation succeeded |
+| `IsPaused` | `bool` | Mutation is paused (offline) |
+| `FailureCount` | `int` | Number of failed attempts during retries |
+| `FailureReason` | `Exception?` | Error from most recent failed attempt |
+| `SubmittedAt` | `DateTime?` | Timestamp of mutation submission |
+
+## UseMutation Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `Mutate` | `void Mutate(TVariables, MutateOptions?)` | Fire-and-forget mutation |
+| `MutateAsync` | `Task<TData> MutateAsync(TVariables, MutateOptions?)` | Awaitable mutation (throws on error) |
+| `Reset` | `void Reset()` | Reset to idle state |
