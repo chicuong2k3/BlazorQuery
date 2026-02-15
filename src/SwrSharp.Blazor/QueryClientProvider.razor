@@ -1,4 +1,4 @@
-@implements IDisposable
+@implements IAsyncDisposable
 
 <CascadingValue Value="@_resolvedClient">
     @ChildContent
@@ -13,16 +13,30 @@
     [Parameter] public QueryClient? Client { get; set; }
 
     [Inject] private QueryClient InjectedClient { get; set; } = null!;
+    [Inject] private BrowserFocusManager FocusManager { get; set; } = null!;
+    [Inject] private BrowserOnlineManager OnlineManager { get; set; } = null!;
 
     private QueryClient _resolvedClient = null!;
+    private bool _initialized;
 
     protected override void OnInitialized()
     {
         _resolvedClient = Client ?? InjectedClient;
     }
 
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Only dispose if we own the client (not injected from DI)
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await FocusManager.InitializeAsync();
+            await OnlineManager.InitializeAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await FocusManager.DisposeAsync();
+        await OnlineManager.DisposeAsync();
     }
 }

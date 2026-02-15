@@ -12,4 +12,9 @@
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.11"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\SwrSharp.Core\SwrSharp.Core.csproj"/>
+        <ProjectReference Include="..\..\..\src\SwrSharp.Blazor\SwrSharp.Blazor.csproj"/>
+    </ItemGroup>
+
 </Project>

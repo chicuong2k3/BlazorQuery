@@ -1,0 +1,168 @@
+@page "/todos"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Todos</PageTitle>
+
+<h1>Todos</h1>
+
+<p>This component demonstrates <code>UseQuery</code> + <code>UseMutation</code> with cache invalidation.</p>
+
+<div class="mb-3">
+    <div class="input-group">
+        <input class="form-control" placeholder="New todo..." @bind="_newTodoTitle" @bind:event="oninput"
+               @onkeydown="HandleKeyDown" disabled="@_addTodo.IsPending"/>
+        <button class="btn btn-primary" @onclick="HandleAdd" disabled="@(_addTodo.IsPending || string.IsNullOrWhiteSpace(_newTodoTitle))">
+            @(_addTodo.IsPending ? "Adding..." : "Add")
+        </button>
+    </div>
+</div>
+
+@if (_todos.IsPending)
+{
+    <p><em>Loading todos...</em></p>
+}
+else if (_todos.IsError)
+{
+    <div class="alert alert-danger">Error: @_todos.Error?.Message</div>
+}
+else if (_todos.IsSuccess)
+{
+    @if (_todos.IsFetchingBackground)
+    {
+        <p class="text-muted"><small>Refreshing...</small></p>
+    }
+
+    @if (_todos.Data!.Count == 0)
+    {
+        <p class="text-muted">No todos yet. Add one above!</p>
+    }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var todo in _todos.Data!)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="@(todo.Done ? "text-decoration-line-through text-muted" : "")">
+                        @todo.Title
+                    </span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-success me-1"
+                                @onclick="() => HandleToggle(todo)"
+                                disabled="@_toggleTodo.IsPending">
+                            @(todo.Done ? "Undo" : "Done")
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger"
+                                @onclick="() => HandleDelete(todo)"
+                                disabled="@_deleteTodo.IsPending">
+                            Delete
+                        </button>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@if (_addTodo.IsError)
+{
+    <div class="alert alert-danger mt-2">Mutation error: @_addTodo.Error?.Message</div>
+}
+
+@code {
+    private UseQuery<List<TodoItem>> _todos = null!;
+    private UseMutation<TodoItem, string> _addTodo = null!;
+    private UseMutation<TodoItem, TodoItem> _toggleTodo = null!;
+    private UseMutation<bool, TodoItem> _deleteTodo = null!;
+    private string _newTodoTitle = "";
+
+    // In-memory store (simulates a server)
+    private static readonly List<TodoItem> Store =
+    [
+        new() { Id = 1, Title = "Learn SwrSharp", Done = false },
+        new() { Id = 2, Title = "Build a Blazor app", Done = false },
+        new() { Id = 3, Title = "Try UseMutation", Done = true }
+    ];
+    private static int _nextId = 4;
+
+    protected override void OnParametersSet()
+    {
+        _todos = UseQuery(new QueryOptions<List<TodoItem>>(
+            queryKey: new QueryKey("todos"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300); // Simulate network
+                return Store.Select(t => new TodoItem { Id = t.Id, Title = t.Title, Done = t.Done }).ToList();
+            },
+            staleTime: TimeSpan.FromSeconds(10)
+        ));
+
+        _addTodo = UseMutation(new MutationOptions<TodoItem, string>
+        {
+            MutationFn = async title =>
+            {
+                await Task.Delay(200);
+                var todo = new TodoItem { Id = _nextId++, Title = title, Done = false };
+                Store.Add(todo);
+                return todo;
+            },
+            OnSuccess = (_, _, _, ctx) =>
+            {
+                ctx.Client.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("todos") });
+                return Task.CompletedTask;
+            }
+        });
+
+        _toggleTodo = UseMutation(new MutationOptions<TodoItem, TodoItem>
+        {
+            MutationFn = async todo =>
+            {
+                await Task.Delay(150);
+                var existing = Store.FirstOrDefault(t => t.Id == todo.Id);
+                if (existing != null) existing.Done = !existing.Done;
+                return existing ?? todo;
+            },
+            OnSuccess = (_, _, _, ctx) =>
+            {
+                ctx.Client.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("todos") });
+                return Task.CompletedTask;
+            }
+        });
+
+        _deleteTodo = UseMutation(new MutationOptions<bool, TodoItem>
+        {
+            MutationFn = async todo =>
+            {
+                await Task.Delay(150);
+                Store.RemoveAll(t => t.Id == todo.Id);
+                return true;
+            },
+            OnSuccess = (_, _, _, ctx) =>
+            {
+                ctx.Client.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("todos") });
+                return Task.CompletedTask;
+            }
+        });
+    }
+
+    private async Task HandleAdd()
+    {
+        if (string.IsNullOrWhiteSpace(_newTodoTitle)) return;
+        await _addTodo.MutateAsync(_newTodoTitle.Trim());
+        _newTodoTitle = "";
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await HandleAdd();
+    }
+
+    private void HandleToggle(TodoItem todo) => _toggleTodo.Mutate(todo);
+    private void HandleDelete(TodoItem todo) => _deleteTodo.Mutate(todo);
+
+    public class TodoItem
+    {
+        public int Id { get; init; }
+        public string Title { get; init; } = "";
+        public bool Done { get; set; }
+    }
+}

@@ -8,6 +8,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\SwrSharp.Samples.BlazorWebAppWasm.Client\SwrSharp.Samples.BlazorWebAppWasm.Client.csproj"/>
+        <ProjectReference Include="..\..\..\src\SwrSharp.Core\SwrSharp.Core.csproj"/>
+        <ProjectReference Include="..\..\..\src\SwrSharp.Blazor\SwrSharp.Blazor.csproj"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.11"/>
     </ItemGroup>
 

@@ -1,3 +1,4 @@
+using SwrSharp.Blazor;
 using SwrSharp.Samples.BlazorWebAppWasm.Client.Pages;
 using SwrSharp.Samples.BlazorWebAppWasm.Components;
 
@@ -6,6 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
+
+// Register SwrSharp for server-side prerendering
+builder.Services.AddSwrSharp();
 
 var app = builder.Build();
 

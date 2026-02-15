@@ -10,21 +10,23 @@ category: "Getting Started"
 
 ## Prerequisites
 
-- .NET 7.0 or later
+- .NET 8.0 or later
 - Blazor Server or Blazor WebAssembly project
 
-## NuGet Package
+## NuGet Packages
 
-Install SwrSharp via NuGet:
+Install the core library and Blazor integration:
 
 ```bash
-dotnet add package SwrSharp
+dotnet add package SwrSharp.Core
+dotnet add package SwrSharp.Blazor
 ```
 
 Or using Package Manager:
 
 ```powershell
-Install-Package SwrSharp
+Install-Package SwrSharp.Core
+Install-Package SwrSharp.Blazor
 ```
 
 ## Setup
@@ -34,67 +36,84 @@ Install-Package SwrSharp
 Add SwrSharp services to your `Program.cs`:
 
 ```csharp
-using SwrSharp.Core;
+using SwrSharp.Blazor;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Add SwrSharp services
+// Add SwrSharp services (registers QueryClient, BrowserFocusManager, BrowserOnlineManager)
 builder.Services.AddSwrSharp();
 
-// Other services...
-builder.Services.AddRazorComponents();
-
-var app = builder.Build();
-// ...
+await builder.Build().RunAsync();
 ```
 
-### 2. Configure Options (Optional)
+### 2. Add QueryClientProvider
+
+Wrap your app with `QueryClientProvider` in your `Routes.razor` or layout:
+
+```razor
+<QueryClientProvider>
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)"/>
+            <FocusOnNavigate RouteData="routeData" Selector="h1"/>
+        </Found>
+    </Router>
+</QueryClientProvider>
+```
+
+### 3. Configure Options (Optional)
 
 You can customize SwrSharp behavior globally:
 
 ```csharp
 builder.Services.AddSwrSharp(options =>
 {
-    // Default cache time for queries (stale time)
-    options.DefaultStaleTime = TimeSpan.FromMinutes(5);
-    
-    // Default garbage collection time
-    options.DefaultGarbageCollectionTime = TimeSpan.FromMinutes(15);
-    
-    // Enable detailed logging
-    options.EnableLogging = true;
+    options.DefaultNetworkMode = NetworkMode.Online;
+    options.DefaultRefetchOnWindowFocus = true;
 });
 ```
 
-### 3. Inject QueryClient
+### 4. Add Imports
 
-In your Blazor components, inject the `QueryClient`:
+Add these to your `_Imports.razor`:
 
-```csharp
-@inject QueryClient QueryClient
+```razor
+@using SwrSharp.Core
+@using SwrSharp.Blazor
 ```
 
 ## Verify Installation
 
-Create a simple test page to verify everything is working:
+Create a simple component that uses `UseQuery`:
 
-```csharp
+```razor
 @page "/test"
-@inject QueryClient QueryClient
+@inherits SwrSharpComponentBase
 
-<h1>SwrSharp Test</h1>
-<p>QueryClient is ready: @(QueryClient != null)</p>
+@if (greeting.IsLoading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <p>@greeting.Data</p>
+}
 
 @code {
-    protected override void OnInitialized()
+    private UseQuery<string> greeting = null!;
+
+    protected override void OnParametersSet()
     {
-        // Your code here
+        greeting = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("greeting"),
+            queryFn: async _ => "Hello from SwrSharp!"
+        ));
     }
 }
 ```
 
 ## Next Steps
 
-- Read [Query Basics](/docs/guides/query-basics)
-- Learn [Query Keys](/docs/guides/query-keys)
-- Explore [API Reference](/docs/api/query-client)
+- Read the [Blazor Integration](/docs/guides/blazor-integration) guide
+- Learn about [Query Keys](/docs/guides/query-keys)
+- Explore [API Reference](/docs/api/use-query)

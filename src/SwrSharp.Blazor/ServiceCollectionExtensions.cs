@@ -9,7 +9,7 @@ namespace SwrSharp.Blazor;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers a scoped QueryClient with optional configuration.
+    /// Registers SwrSharp services including QueryClient, BrowserFocusManager, and BrowserOnlineManager.
     /// </summary>
     public static IServiceCollection AddSwrSharp(
         this IServiceCollection services,
@@ -18,9 +18,14 @@ public static class ServiceCollectionExtensions
         var options = new SwrSharpOptions();
         configure?.Invoke(options);
 
-        services.AddScoped<QueryClient>(_ =>
+        services.AddScoped<BrowserFocusManager>();
+        services.AddScoped<BrowserOnlineManager>();
+
+        services.AddScoped<QueryClient>(sp =>
         {
-            var client = new QueryClient();
+            var focusManager = sp.GetRequiredService<BrowserFocusManager>();
+            var onlineManager = sp.GetRequiredService<BrowserOnlineManager>();
+            var client = new QueryClient(onlineManager: onlineManager, focusManager: focusManager);
             client.DefaultNetworkMode = options.DefaultNetworkMode;
             client.DefaultRefetchOnWindowFocus = options.DefaultRefetchOnWindowFocus;
             return client;
