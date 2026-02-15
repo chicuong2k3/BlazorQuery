@@ -5,11 +5,8 @@ order: 10
 category: "Guides"
 ---
 
-# Window Focus Refetching
 
 If a user leaves your application and returns and the query data is stale, **SwrSharp automatically requests fresh data for you in the background**. You can disable this globally or per-query using the `refetchOnWindowFocus` option.
-
-> Note: SwrSharp follows the React Query behavior and terminology where `staleTime: 0` means the data is immediately stale (i.e. "always stale"). See the React Query docs for the canonical behavior: https://tanstack.com/query/latest/docs
 
 ## Basic Usage
 
@@ -169,17 +166,10 @@ window.blazorQueryFocusManager = {
 
 **Usage**:
 ```csharp
-@inject IJSRuntime JSRuntime
+var focusManager = new BlazorFocusManager(jsRuntime);
+var queryClient = new QueryClient(focusManager: focusManager);
 
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        var focusManager = new BlazorFocusManager(JSRuntime);
-        var queryClient = new QueryClient(focusManager: focusManager);
-        
-        // Now queries will refetch when window gains focus
-    }
-}
+// Now queries will refetch when window gains focus
 ```
 
 ### WPF
@@ -438,54 +428,48 @@ public class TodoApp : IDisposable
     {
         _focusManager = focusManager;
         _queryClient = new QueryClient(focusManager: focusManager);
-        
+
         // Monitor focus changes for logging
         _focusManager.FocusChanged += OnFocusChanged;
     }
 
-    public async Task InitializeAsync()
+    public void Initialize()
     {
         _todosQuery = new UseQuery<List<Todo>>(
             new QueryOptions<List<Todo>>(
                 queryKey: new("todos"),
-                queryFn: async ctx => {
-                    Console.WriteLine("Fetching todos...");
-                    return await FetchTodosAsync();
-                },
+                queryFn: async ctx => await FetchTodosAsync(),
                 staleTime: TimeSpan.FromMinutes(5),
                 refetchOnWindowFocus: true // Will refetch when window gains focus
             ),
             _queryClient
         );
 
-        _todosQuery.OnChange += RenderUI;
-        await _todosQuery.ExecuteAsync();
+        _todosQuery.OnChange += () =>
+        {
+            if (_todosQuery.IsFetchingBackground)
+            {
+                // "Refreshing todos in background..."
+            }
+
+            if (_todosQuery.IsSuccess && _todosQuery.Data != null)
+            {
+                // "{count} todos loaded"
+            }
+        };
+
+        _ = _todosQuery.ExecuteAsync();
     }
 
     private void OnFocusChanged(bool isFocused)
     {
         if (isFocused)
         {
-            Console.WriteLine("✅ Window gained focus - checking for stale data...");
+            // "Window gained focus - checking for stale data..."
         }
         else
         {
-            Console.WriteLine("⏸️ Window lost focus");
-        }
-    }
-
-    private void RenderUI()
-    {
-        if (_todosQuery == null) return;
-
-        if (_todosQuery.IsFetchingBackground)
-        {
-            Console.WriteLine("🔄 Refreshing todos in background...");
-        }
-
-        if (_todosQuery.IsSuccess && _todosQuery.Data != null)
-        {
-            Console.WriteLine($"📋 {_todosQuery.Data.Count} todos loaded");
+            // "Window lost focus"
         }
     }
 

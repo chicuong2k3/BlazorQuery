@@ -5,8 +5,6 @@ order: 12
 category: "Guides"
 ---
 
-# Placeholder Query Data
-
 ## What is Placeholder Data?
 
 Placeholder data allows a query to behave as if it already has data, similar to `initialData`, but **the data is NOT persisted to the cache**. This is useful for partial or preview data while the actual data is fetched in the background.
@@ -370,67 +368,4 @@ placeholderDataFunc: (prev, prevQuery) => {
 
 // ❌ Bad: Computed immediately
 placeholderData: ExpensiveComputation() // Called on every render
-```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-// Basic placeholder
-const query = useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  placeholderData: placeholderTodos,
-})
-
-// From cache
-const query = useQuery({
-  queryKey: ['blogPost', id],
-  queryFn: () => fetchPost(id),
-  placeholderData: () =>
-    queryClient.getQueryData(['blogPosts'])?.find(p => p.id === id),
-})
-
-// With previous data
-const query = useQuery({
-  queryKey: ['posts', page],
-  queryFn: () => fetchPage(page),
-  placeholderData: (previousData) => previousData,
-})
-```
-
-### SwrSharp (C#):
-```csharp
-// Basic placeholder
-var query = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        placeholderData: placeholderTodos
-    ),
-    queryClient
-);
-
-// From cache
-var query = new UseQuery<BlogPost>(
-    new QueryOptions<BlogPost>(
-        queryKey: new("blogPost", id),
-        queryFn: async ctx => await FetchPostAsync(id),
-        placeholderDataFunc: (_, __) => {
-            var posts = queryClient.GetQueryData<List<BlogPost>>(new("blogPosts"));
-            return posts?.Find(p => p.Id == id);
-        }
-    ),
-    queryClient
-);
-
-// With previous data
-var query = new UseQuery<List<Post>>(
-    new QueryOptions<List<Post>>(
-        queryKey: new("posts", page),
-        queryFn: async ctx => await FetchPageAsync(page),
-        placeholderDataFunc: (previousData, previousQuery) => previousData
-    ),
-    queryClient
-);
 ```

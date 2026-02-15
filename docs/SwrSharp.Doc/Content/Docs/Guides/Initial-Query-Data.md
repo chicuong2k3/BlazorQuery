@@ -62,12 +62,21 @@ var query = new UseQuery<List<Todo>>(
     queryClient
 );
 
-// Has initial data immediately
+// Has initial data immediately (before any fetch)
 Console.WriteLine(query.Data!.Count); // 2 (initial data)
 
-// But will refetch because staleTime = 0 (immediately stale)
-await query.ExecuteAsync();
-Console.WriteLine(query.Data!.Count); // Fresh data from server
+query.OnChange += () =>
+{
+    // Called when refetch completes with fresh server data
+    if (query.IsSuccess && query.Data != null)
+    {
+        Console.WriteLine($"Updated: {query.Data.Count} todos from server");
+        // Notify your UI framework to re-render
+    }
+};
+
+// Will refetch because staleTime = 0 (immediately stale)
+_ = query.ExecuteAsync();
 ```
 
 ### With `staleTime` (Delayed Refetch)
@@ -86,12 +95,21 @@ var query = new UseQuery<List<Todo>>(
     queryClient
 );
 
-// Has data, considered fresh
-await query.ExecuteAsync(); // Won't actually fetch (data is fresh)
+query.OnChange += () =>
+{
+    if (query.IsSuccess && query.Data != null)
+    {
+        Console.WriteLine($"Data updated: {query.Data.Count} todos");
+        // Notify your UI framework to re-render
+    }
+};
 
-await Task.Delay(1100); // Wait for stale time to pass
+// Has data, considered fresh — ExecuteAsync won't actually fetch
+_ = query.ExecuteAsync();
 
-await query.ExecuteAsync(); // Now it will fetch (data is stale)
+// After 1 second, data becomes stale.
+// A subsequent ExecuteAsync (e.g., triggered by window focus or manual refetch)
+// will refetch from the server.
 ```
 
 ### With `initialDataUpdatedAt` (Accurate Staleness)
@@ -114,9 +132,17 @@ var query = new UseQuery<List<Todo>>(
     queryClient
 );
 
+query.OnChange += () =>
+{
+    if (query.IsSuccess && query.Data != null)
+    {
+        // Notify your UI framework to re-render
+    }
+};
+
 // If cachedTimestamp is < 1 minute old: won't refetch (still fresh)
 // If cachedTimestamp is > 1 minute old: will refetch (stale)
-await query.ExecuteAsync();
+_ = query.ExecuteAsync();
 ```
 
 This option allows the `staleTime` to be used for its original purpose, determining how fresh the data needs to be, while also allowing the data to be refetched if the `initialData` is older than the `staleTime`.
@@ -147,18 +173,9 @@ var query = new UseQuery<List<Todo>>(
 In some circumstances, you may be able to provide the initial data for a query from the cached result of another query. A good example of this would be searching the cached data from a todos list query for an individual todo item, then using that as the initial data for your individual todo query:
 
 ```csharp
-// First, we have a todos list query
-var todosQuery = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync()
-    ),
-    queryClient
-);
+// Assume a todos list query has already been executed and cached.
+// When navigating to a todo detail, use cached data as initial data:
 
-await todosQuery.ExecuteAsync();
-
-// Now create individual todo query using cached data as initial data
 var todoId = 123;
 var todoQuery = new UseQuery<Todo>(
     new QueryOptions<Todo>(
@@ -178,6 +195,17 @@ if (todoQuery.Data != null)
 {
     Console.WriteLine($"Found in cache: {todoQuery.Data.Title}");
 }
+
+todoQuery.OnChange += () =>
+{
+    if (todoQuery.IsSuccess && todoQuery.Data != null)
+    {
+        // Notify your UI framework to re-render
+    }
+};
+
+// Will refetch from server (staleTime defaults to 0)
+_ = todoQuery.ExecuteAsync();
 ```
 
 ## Initial Data from Cache with `initialDataUpdatedAt`
@@ -241,16 +269,19 @@ var todoQuery = new UseQuery<Todo>(
 public class TodoApp : IDisposable
 {
     private readonly QueryClient _queryClient;
-    
+    private UseQuery<List<Todo>>? _todosQuery;
+    private UseQuery<Todo>? _todoDetailQuery;
+
     public TodoApp()
     {
         _queryClient = new QueryClient();
     }
 
-    public async Task LoadTodosListAsync()
+    public void LoadTodosList()
     {
-        // Load todos list
-        var todosQuery = new UseQuery<List<Todo>>(
+        _todosQuery?.Dispose();
+
+        _todosQuery = new UseQuery<List<Todo>>(
             new QueryOptions<List<Todo>>(
                 queryKey: new("todos"),
                 queryFn: async ctx => await FetchTodosAsync(),
@@ -259,42 +290,39 @@ public class TodoApp : IDisposable
             _queryClient
         );
 
-        await todosQuery.ExecuteAsync();
-        
-        Console.WriteLine($"Loaded {todosQuery.Data!.Count} todos");
+        _todosQuery.OnChange += () =>
+        {
+            if (_todosQuery.IsSuccess && _todosQuery.Data != null)
+            {
+                // "Loaded {count} todos"
+                // Notify your UI framework to re-render
+            }
+        };
+
+        _ = _todosQuery.ExecuteAsync();
     }
 
-    public async Task LoadTodoDetailAsync(int todoId)
+    public void LoadTodoDetail(int todoId)
     {
-        // Load todo detail with initial data from list cache
-        var todoQuery = new UseQuery<Todo>(
+        _todoDetailQuery?.Dispose();
+
+        _todoDetailQuery = new UseQuery<Todo>(
             new QueryOptions<Todo>(
                 queryKey: new("todo", todoId),
-                queryFn: async ctx => {
-                    Console.WriteLine($"Fetching todo {todoId} from server...");
-                    return await FetchTodoAsync(todoId);
-                },
-                initialDataFunc: () => {
-                    Console.WriteLine("Trying to get from cache...");
-                    
+                queryFn: async ctx => await FetchTodoAsync(todoId),
+                initialDataFunc: () =>
+                {
                     var state = _queryClient.GetQueryState(new("todos"));
-                    
+
                     // Only use cached data if it's fresh (< 5 minutes old)
-                    if (state != null && 
+                    if (state != null &&
                         (DateTime.UtcNow - state.DataUpdatedAt).TotalSeconds <= 300)
                     {
                         var todos = state.Data as List<Todo>;
-                        var cachedTodo = todos?.Find(t => t.Id == todoId);
-                        
-                        if (cachedTodo != null)
-                        {
-                            Console.WriteLine("Found in cache!");
-                            return cachedTodo;
-                        }
+                        return todos?.Find(t => t.Id == todoId);
                     }
-                    
-                    Console.WriteLine("Not in cache or too old");
-                    return null;
+
+                    return null; // Let it fetch from server
                 },
                 initialDataUpdatedAt: _queryClient.GetQueryState(new("todos"))?.DataUpdatedAt,
                 staleTime: TimeSpan.FromMinutes(5)
@@ -302,166 +330,30 @@ public class TodoApp : IDisposable
             _queryClient
         );
 
-        // If found in cache and fresh: shows immediately, no fetch
-        // If not in cache or stale: fetches from server
-        await todoQuery.ExecuteAsync();
-        
-        if (todoQuery.IsSuccess && todoQuery.Data != null)
+        // If found in cache and fresh: shows immediately
+        if (_todoDetailQuery.Data != null)
         {
-            Console.WriteLine($"Todo: {todoQuery.Data.Title}");
+            // "Instant: {title}" — display cached data right away
         }
+
+        _todoDetailQuery.OnChange += () =>
+        {
+            if (_todoDetailQuery.IsSuccess && _todoDetailQuery.Data != null)
+            {
+                // "Todo: {title}" — updated from server (or confirmed fresh)
+                // Notify your UI framework to re-render
+            }
+        };
+
+        // If initial data is stale or missing: fetches from server
+        _ = _todoDetailQuery.ExecuteAsync();
     }
 
     public void Dispose()
     {
+        _todosQuery?.Dispose();
+        _todoDetailQuery?.Dispose();
         _queryClient.Dispose();
     }
 }
-```
-
-## Best Practices
-
-### 1. **Use `initialData` for Complete Data**
-
-```csharp
-// ✅ Good: Complete, valid data
-var query = new UseQuery<User>(
-    new QueryOptions<User>(
-        queryKey: new("user", userId),
-        queryFn: async ctx => await FetchUserAsync(userId),
-        initialData: completeUserObject // Full user data
-    ),
-    queryClient
-);
-
-// ❌ Bad: Incomplete or placeholder data
-var query = new UseQuery<User>(
-    new QueryOptions<User>(
-        queryKey: new("user", userId),
-        queryFn: async ctx => await FetchUserAsync(userId),
-        initialData: new User { Name = "Loading..." } // Placeholder!
-    ),
-    queryClient
-);
-// For placeholders, use placeholderData instead (separate feature)
-```
-
-### 2. **Use `initialDataUpdatedAt` for Accurate Staleness**
-
-```csharp
-// ✅ Good: Accurate staleness checking
-var query = new UseQuery<Data>(
-    new QueryOptions<Data>(
-        queryKey: new("data"),
-        queryFn: async ctx => await FetchAsync(),
-        initialData: cachedData,
-        initialDataUpdatedAt: cachedTimestamp, // When was it cached?
-        staleTime: TimeSpan.FromMinutes(5)
-    ),
-    queryClient
-);
-
-// ❌ Less accurate: Treats initial data as fresh
-var query = new UseQuery<Data>(
-    new QueryOptions<Data>(
-        queryKey: new("data"),
-        queryFn: async ctx => await FetchAsync(),
-        initialData: cachedData // Could be old!
-        // No initialDataUpdatedAt - treated as just fetched
-    ),
-    queryClient
-);
-```
-
-### 3. **Use Functions for Expensive Operations**
-
-```csharp
-// ✅ Good: Lazy evaluation
-var query = new UseQuery<Data>(
-    new QueryOptions<Data>(
-        queryKey: new("data"),
-        queryFn: async ctx => await FetchAsync(),
-        initialDataFunc: () => ExpensiveComputation() // Called once
-    ),
-    queryClient
-);
-
-// ❌ Bad: Computed on every UseQuery creation
-var expensiveData = ExpensiveComputation(); // Computed immediately!
-var query = new UseQuery<Data>(
-    new QueryOptions<Data>(
-        queryKey: new("data"),
-        queryFn: async ctx => await FetchAsync(),
-        initialData: expensiveData
-    ),
-    queryClient
-);
-```
-
-### 4. **Conditional Initial Data from Cache**
-
-```csharp
-// ✅ Good: Only use fresh cached data
-initialDataFunc: () => {
-    var state = queryClient.GetQueryState(sourceKey);
-    if (state != null && IsFreshEnough(state.DataUpdatedAt))
-    {
-        return ExtractData(state.Data);
-    }
-    return null; // Let it fetch
-}
-
-// ❌ Bad: Always use cached data (might be very old)
-initialDataFunc: () => {
-    return queryClient.GetQueryData<Data>(sourceKey); // Could be ancient!
-}
-```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-// Basic initialData
-const query = useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  initialData: initialTodos,
-})
-
-// From cache with dataUpdatedAt
-const query = useQuery({
-  queryKey: ['todo', todoId],
-  queryFn: () => fetchTodo(todoId),
-  initialData: () =>
-    queryClient.getQueryData(['todos'])?.find(d => d.id === todoId),
-  initialDataUpdatedAt: () =>
-    queryClient.getQueryState(['todos'])?.dataUpdatedAt,
-})
-```
-
-### SwrSharp (C#):
-```csharp
-// Basic initialData
-var query = new UseQuery<List<Todo>>(
-    new QueryOptions<List<Todo>>(
-        queryKey: new("todos"),
-        queryFn: async ctx => await FetchTodosAsync(),
-        initialData: initialTodos
-    ),
-    queryClient
-);
-
-// From cache with dataUpdatedAt
-var query = new UseQuery<Todo>(
-    new QueryOptions<Todo>(
-        queryKey: new("todo", todoId),
-        queryFn: async ctx => await FetchTodoAsync(todoId),
-        initialDataFunc: () => {
-            var todos = queryClient.GetQueryData<List<Todo>>(new("todos"));
-            return todos?.Find(t => t.Id == todoId);
-        },
-        initialDataUpdatedAt: queryClient.GetQueryState(new("todos"))?.DataUpdatedAt
-    ),
-    queryClient
-);
 ```
