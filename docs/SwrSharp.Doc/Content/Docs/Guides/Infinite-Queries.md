@@ -5,8 +5,6 @@ order: 14
 category: "Guides"
 ---
 
-# Infinite Queries
-
 Rendering lists that can additively "load more" data onto an existing set of data or "infinite scroll" is a very common UI pattern. SwrSharp supports infinite queries through the `UseInfiniteQuery` class for querying these types of lists.
 
 When using `UseInfiniteQuery`, you'll notice a few things are different:
@@ -32,7 +30,7 @@ Let's assume we have an API that returns pages of projects 3 at a time based on 
 /api/projects?cursor=9  → { data: [...], nextCursor: null }
 ```
 
-## Complete Example
+And we want to build an infinite scroll UI that loads more projects when the user clicks a "Load More" button. Here's how we can do that with `UseInfiniteQuery`:
 
 ```csharp
 public class InfiniteProjectsComponent : IDisposable
@@ -45,7 +43,7 @@ public class InfiniteProjectsComponent : IDisposable
         _queryClient = queryClient;
     }
 
-    public async Task InitializeAsync()
+    public void Initialize()
     {
         _query = new UseInfiniteQuery<ProjectsPage, int>(
             new InfiniteQueryOptions<ProjectsPage, int>(
@@ -64,71 +62,40 @@ public class InfiniteProjectsComponent : IDisposable
             _queryClient
         );
 
-        _query.OnChange += RenderUI;
+        _query.OnChange += () =>
+        {
+            // Check query state for rendering:
+            //
+            // _query.IsPending
+            //   → Loading first page, show loading screen
+            //
+            // _query.IsError
+            //   → Show error: _query.Error?.Message
+            //
+            // _query.IsSuccess
+            //   → Render all pages from _query.Data.Pages
+            //   → If _query.IsFetchingNextPage: show "Loading more..."
+            //   → If _query.HasNextPage: show "Load More" button
+            //   → If _query.IsFetching && !_query.IsFetchingNextPage: background refresh
+            //
+            // Notify your UI framework to re-render
+        };
 
         // Load first page
-        await _query.ExecuteAsync();
+        _ = _query.ExecuteAsync();
     }
 
-    private void RenderUI()
-    {
-        if (_query == null) return;
-
-        if (_query.IsPending)
-        {
-            Console.WriteLine("Loading first page...");
-            return;
-        }
-
-        if (_query.IsError)
-        {
-            Console.WriteLine($"Error: {_query.Error?.Message}");
-            return;
-        }
-
-        // Render all pages
-        Console.WriteLine("=== Projects ===");
-        foreach (var page in _query.Data.Pages)
-        {
-            foreach (var project in page.Projects)
-            {
-                Console.WriteLine($"- {project.Name}");
-            }
-        }
-
-        // Load more button
-        if (_query.IsFetchingNextPage)
-        {
-            Console.WriteLine("Loading more...");
-        }
-        else if (_query.HasNextPage)
-        {
-            Console.WriteLine("[Load More]");
-        }
-        else
-        {
-            Console.WriteLine("Nothing more to load");
-        }
-
-        // Background refresh indicator
-        if (_query.IsFetching && !_query.IsFetchingNextPage)
-        {
-            Console.WriteLine("🔄 Refreshing...");
-        }
-    }
-
-    public async Task LoadMoreAsync()
+    public void LoadMore()
     {
         if (_query == null || !_query.HasNextPage || _query.IsFetching)
             return;
 
-        await _query.FetchNextPageAsync();
+        _ = _query.FetchNextPageAsync();
     }
 
     public void Dispose()
     {
         _query?.Dispose();
-        _queryClient?.Dispose();
     }
 }
 
@@ -159,14 +126,14 @@ query.Data.PageParams // List<object?> - params used to fetch each page
 ### Navigation
 
 ```csharp
-// Fetch next page
-await query.FetchNextPageAsync();
+// Fetch next page (fire-and-forget, observe via OnChange)
+_ = query.FetchNextPageAsync();
 
-// Fetch previous page  
-await query.FetchPreviousPageAsync();
+// Fetch previous page
+_ = query.FetchPreviousPageAsync();
 
 // Refetch all pages
-await query.RefetchAsync();
+_ = query.RefetchAsync();
 ```
 
 ### State Flags
@@ -187,22 +154,22 @@ Calling `FetchNextPageAsync()` while a fetch is in progress can cause data overw
 // ✅ Good: Check before fetching
 if (query.HasNextPage && !query.IsFetching)
 {
-    await query.FetchNextPageAsync();
+    _ = query.FetchNextPageAsync();
 }
 
 // ❌ Bad: No check
-await query.FetchNextPageAsync(); // Might overwrite data!
+_ = query.FetchNextPageAsync(); // Might overwrite data!
 ```
 
 For infinite scroll:
 
 ```csharp
-private async Task OnScrollReachedEnd()
+void OnScrollReachedEnd()
 {
     // Check both conditions
     if (_query.HasNextPage && !_query.IsFetching)
     {
-        await _query.FetchNextPageAsync();
+        _ = _query.FetchNextPageAsync();
     }
 }
 ```
@@ -214,12 +181,13 @@ When an infinite query needs to be refetched (e.g., becomes stale), **each page 
 ```csharp
 // User has loaded pages 0, 3, 6
 // Data becomes stale, refetch is triggered
-await query.RefetchAsync();
+_ = query.RefetchAsync();
 
 // Refetches sequentially:
 // 1. Page with cursor 0
 // 2. Page with cursor 3
 // 3. Page with cursor 6
+// OnChange fires as each page is refetched
 ```
 
 ## Bi-Directional Infinite Lists
@@ -241,10 +209,10 @@ var query = new UseInfiniteQuery<ProjectsPage, int>(
 );
 
 // Load newer content
-await query.FetchNextPageAsync();
+_ = query.FetchNextPageAsync();
 
 // Load older content
-await query.FetchPreviousPageAsync();
+_ = query.FetchPreviousPageAsync();
 ```
 
 ## Limiting Pages with `maxPages`
@@ -340,66 +308,10 @@ By default, `FetchNextPageAsync` prevents concurrent fetches. Use `cancelRefetch
 
 ```csharp
 // Default: prevents concurrent fetches
-await query.FetchNextPageAsync(); // If already fetching, does nothing
+_ = query.FetchNextPageAsync(); // If already fetching, does nothing
 
 // Allow concurrent (not recommended)
-await query.FetchNextPageAsync(cancelRefetch: false);
-```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = 
-  useInfiniteQuery({
-    queryKey: ['projects'],
-    queryFn: async ({ pageParam }) => {
-      const res = await fetch('/api/projects?cursor=' + pageParam)
-      return res.json()
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-  })
-
-// Render
-data.pages.map(page => 
-  page.data.map(project => <div>{project.name}</div>)
-)
-
-// Load more
-<button onClick={() => fetchNextPage()} disabled={!hasNextPage}>
-  Load More
-</button>
-```
-
-### SwrSharp (C#):
-```csharp
-var query = new UseInfiniteQuery<ProjectsPage, int>(
-    new InfiniteQueryOptions<ProjectsPage, int>(
-        queryKey: new("projects"),
-        queryFn: async ctx => {
-            var pageParam = (int)ctx.PageParam!;
-            return await FetchProjectsAsync(pageParam);
-        },
-        initialPageParam: 0,
-        getNextPageParam: (lastPage, allPages, lastPageParam) => 
-            lastPage.NextCursor
-    ),
-    queryClient
-);
-
-// Render
-foreach (var page in query.Data.Pages)
-{
-    foreach (var project in page.Projects)
-        Console.WriteLine(project.Name);
-}
-
-// Load more
-if (query.HasNextPage && !query.IsFetching)
-{
-    await query.FetchNextPageAsync();
-}
+_ = query.FetchNextPageAsync(cancelRefetch: false);
 ```
 
 ## Best Practices
@@ -408,11 +320,11 @@ if (query.HasNextPage && !query.IsFetching)
 ```csharp
 // ✅ Good
 if (query.HasNextPage && !query.IsFetching)
-    await query.FetchNextPageAsync();
+    _ = query.FetchNextPageAsync();
 
 // ❌ Bad
 if (query.HasNextPage)
-    await query.FetchNextPageAsync(); // Can cause overwrites!
+    _ = query.FetchNextPageAsync(); // Can cause overwrites!
 ```
 
 ### 2. **Use MaxPages for Long Lists**

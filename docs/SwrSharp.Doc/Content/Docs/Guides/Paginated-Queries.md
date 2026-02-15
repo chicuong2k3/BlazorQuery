@@ -1,11 +1,10 @@
 ---
-title: "Paginated Queries"
+title: "Paginated/Lagged Queries"
 description: "Implementing pagination"
 order: 13
 category: "Guides"
 ---
 
-# Paginated / Lagged Queries
 
 Rendering paginated data is a very common UI pattern and in SwrSharp, it "just works" by including the page information in the query key:
 
@@ -36,8 +35,6 @@ By setting `placeholderData` to keep the previous data using `placeholderDataFun
 - When the new data arrives, the previous `data` is seamlessly swapped to show the new data.
 - `IsPlaceholderData` is made available to know what data the query is currently providing you
 
-## Complete Example: Paginated Projects
-
 ```csharp
 public class PaginatedProjectsComponent : IDisposable
 {
@@ -50,101 +47,59 @@ public class PaginatedProjectsComponent : IDisposable
         _queryClient = queryClient;
     }
 
-    public async Task LoadPageAsync(int page)
+    public void LoadPage(int page)
     {
         _currentPage = page;
+        _projectsQuery?.Dispose();
 
-        // Create new query for this page
         _projectsQuery = new UseQuery<ProjectsPage>(
             new QueryOptions<ProjectsPage>(
                 queryKey: new("projects", page),
-                queryFn: async ctx => {
-                    Console.WriteLine($"Fetching page {page}...");
-                    return await FetchProjectsAsync(page);
-                },
+                queryFn: async ctx => await FetchProjectsAsync(page),
                 // Keep previous data while loading new page
                 placeholderDataFunc: (previousData, previousQuery) => previousData
             ),
             _queryClient
         );
 
-        // Subscribe to changes
-        _projectsQuery.OnChange += RenderUI;
+        _projectsQuery.OnChange += () =>
+        {
+            // Called when state changes (placeholder → real data, or error)
+            // Notify your UI framework to re-render
+        };
 
-        // Render with previous data if available (placeholder)
-        RenderUI();
-
-        // Fetch new page
-        await _projectsQuery.ExecuteAsync();
-
-        // Render with new data
-        RenderUI();
+        _ = _projectsQuery.ExecuteAsync();
     }
 
-    private void RenderUI()
-    {
-        if (_projectsQuery == null)
-            return;
+    // Check query state for rendering:
+    //
+    // _projectsQuery.IsPending && !_projectsQuery.IsPlaceholderData
+    //   → First page load (no previous data), show loading screen
+    //
+    // _projectsQuery.IsPlaceholderData
+    //   → Showing previous page while loading new page
+    //
+    // _projectsQuery.IsSuccess && !_projectsQuery.IsPlaceholderData
+    //   → New page loaded, show real data
 
-        Console.WriteLine("========================");
-        Console.WriteLine($"Page: {_currentPage + 1}");
-        Console.WriteLine("========================");
-
-        if (_projectsQuery.IsPending && !_projectsQuery.IsPlaceholderData)
-        {
-            // First page load (no previous data)
-            Console.WriteLine("⏳ Loading first page...");
-        }
-        else if (_projectsQuery.IsError)
-        {
-            Console.WriteLine($"❌ Error: {_projectsQuery.Error?.Message}");
-        }
-        else
-        {
-            // Has data (real or placeholder)
-            var data = _projectsQuery.Data!;
-
-            if (_projectsQuery.IsPlaceholderData)
-            {
-                Console.WriteLine("📄 [Showing previous page while loading...]");
-            }
-
-            Console.WriteLine($"Projects on page {_currentPage + 1}:");
-            foreach (var project in data.Projects)
-            {
-                Console.WriteLine($"  - {project.Name}");
-            }
-
-            Console.WriteLine();
-            Console.WriteLine($"Has more: {data.HasMore}");
-        }
-
-        if (_projectsQuery.IsFetching)
-        {
-            Console.WriteLine("🔄 Loading...");
-        }
-
-        Console.WriteLine("========================");
-    }
-
-    public async Task PreviousPageAsync()
+    public void PreviousPage()
     {
         if (_currentPage > 0)
         {
-            await LoadPageAsync(_currentPage - 1);
+            LoadPage(_currentPage - 1);
         }
     }
 
-    public async Task NextPageAsync()
+    public void NextPage()
     {
         // Don't navigate if:
         // 1. Currently showing placeholder data (still loading)
         // 2. No more pages available
-        if (_projectsQuery != null && 
-            !_projectsQuery.IsPlaceholderData && 
+        if (_projectsQuery != null &&
+            !_projectsQuery.IsPlaceholderData &&
             _projectsQuery.Data?.HasMore == true)
         {
-            await LoadPageAsync(_currentPage + 1);
+            LoadPage(_currentPage + 1);
         }
     }
 
@@ -158,7 +113,6 @@ public class PaginatedProjectsComponent : IDisposable
     public void Dispose()
     {
         _projectsQuery?.Dispose();
-        _queryClient?.Dispose();
     }
 }
 
@@ -174,60 +128,6 @@ public class Project
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
 }
-```
-
-## Usage Example
-
-```csharp
-var component = new PaginatedProjectsComponent(queryClient);
-
-// Load first page
-await component.LoadPageAsync(0);
-
-// Output:
-// ========================
-// Page: 1
-// ========================
-// ⏳ Loading first page...
-// ========================
-//
-// (after fetch completes)
-// ========================
-// Page: 1
-// ========================
-// Projects on page 1:
-//   - Project A
-//   - Project B
-//   - Project C
-// Has more: true
-// ========================
-
-// Go to next page
-await component.NextPageAsync();
-
-// Output:
-// ========================
-// Page: 2
-// ========================
-// 📄 [Showing previous page while loading...]
-// Projects on page 1:      ← Still showing page 1 data
-//   - Project A
-//   - Project B
-//   - Project C
-// Has more: true
-// 🔄 Loading...
-// ========================
-//
-// (after fetch completes)
-// ========================
-// Page: 2
-// ========================
-// Projects on page 2:      ← Now showing page 2 data
-//   - Project D
-//   - Project E
-//   - Project F
-// Has more: true
-// ========================
 ```
 
 ## Key Benefits
@@ -271,28 +171,28 @@ else
 ```csharp
 // Disable next button while placeholder data is shown
 var canGoNext = !query.IsPlaceholderData && query.Data?.HasMore == true;
-
-if (canGoNext)
-{
-    await LoadNextPageAsync();
-}
-else
-{
-    Console.WriteLine("Please wait for current page to load");
-}
 ```
 
-## Simplified Pattern with Helper Method
+## Simplified Pattern
 
 ```csharp
-public class SimplePagination
+public class SimplePagination : IDisposable
 {
     private readonly QueryClient _queryClient;
+    private UseQuery<Page>? _pageQuery;
     private int _page = 0;
 
-    public async Task<UseQuery<Page>> CreatePageQueryAsync(int page)
+    public SimplePagination(QueryClient queryClient)
     {
-        var query = new UseQuery<Page>(
+        _queryClient = queryClient;
+    }
+
+    public void GoToPage(int page)
+    {
+        _page = page;
+        _pageQuery?.Dispose();
+
+        _pageQuery = new UseQuery<Page>(
             new QueryOptions<Page>(
                 queryKey: new("items", page),
                 queryFn: async ctx => await FetchPageAsync(page),
@@ -301,29 +201,15 @@ public class SimplePagination
             _queryClient
         );
 
-        await query.ExecuteAsync();
-        return query;
-    }
-
-    public async Task GoToPageAsync(int page)
-    {
-        _page = page;
-        var query = await CreatePageQueryAsync(page);
-        RenderPage(query);
-    }
-
-    private void RenderPage(UseQuery<Page> query)
-    {
-        if (query.IsPlaceholderData)
+        _pageQuery.OnChange += () =>
         {
-            Console.WriteLine("[Loading new page...]");
-        }
+            // Notify your UI framework to re-render
+        };
 
-        foreach (var item in query.Data?.Items ?? new())
-        {
-            Console.WriteLine($"- {item}");
-        }
+        _ = _pageQuery.ExecuteAsync();
     }
+
+    public void Dispose() => _pageQuery?.Dispose();
 }
 ```
 
@@ -404,90 +290,6 @@ if (query.IsSuccess && (query.Data?.Items.Count ?? 0) == 0)
         Console.WriteLine("No items found");
     else
         Console.WriteLine("No more items");
-}
-```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-
-function Projects() {
-  const [page, setPage] = useState(0)
-
-  const { data, isPending, isPlaceholderData } = useQuery({
-    queryKey: ['projects', page],
-    queryFn: () => fetchProjects(page),
-    placeholderData: keepPreviousData,
-  })
-
-  return (
-    <div>
-      {isPending ? (
-        <div>Loading...</div>
-      ) : (
-        <div>
-          {data.projects.map(p => <div key={p.id}>{p.name}</div>)}
-        </div>
-      )}
-      <button onClick={() => setPage(p => p - 1)} disabled={page === 0}>
-        Previous
-      </button>
-      <button 
-        onClick={() => setPage(p => p + 1)}
-        disabled={isPlaceholderData || !data.hasMore}
-      >
-        Next
-      </button>
-    </div>
-  )
-}
-```
-
-### SwrSharp (C#):
-```csharp
-public class ProjectsComponent
-{
-    private int _page = 0;
-    private UseQuery<ProjectsPage>? _query;
-
-    public async Task LoadPageAsync(int page)
-    {
-        _page = page;
-
-        _query = new UseQuery<ProjectsPage>(
-            new QueryOptions<ProjectsPage>(
-                queryKey: new("projects", page),
-                queryFn: async ctx => await FetchProjectsAsync(page),
-                placeholderDataFunc: (prev, _) => prev // Like keepPreviousData
-            ),
-            _queryClient
-        );
-
-        await _query.ExecuteAsync();
-        RenderUI();
-    }
-
-    private void RenderUI()
-    {
-        if (_query == null) return;
-
-        if (_query.IsPending && !_query.IsPlaceholderData)
-        {
-            Console.WriteLine("Loading...");
-        }
-        else if (_query.Data != null)
-        {
-            foreach (var project in _query.Data.Projects)
-                Console.WriteLine(project.Name);
-        }
-
-        // Previous button
-        var canPrev = _page > 0;
-        // Next button
-        var canNext = !_query.IsPlaceholderData && _query.Data?.HasMore == true;
-    }
 }
 ```
 

@@ -5,8 +5,6 @@ order: 15
 category: "Guides"
 ---
 
-# Query Invalidation
-
 Waiting for queries to become stale before they are fetched again doesn't always work, especially when you know for a fact that a query's data is out of date because of something the user has done. For that purpose, the `QueryClient` has an `InvalidateQueries` method that lets you intelligently mark queries as stale and potentially refetch them too!
 
 ```csharp
@@ -218,307 +216,39 @@ See [Invalidations from Mutations](/docs/Guides/Invalidations-from-Mutations) fo
 Invalidate when user explicitly requests fresh data:
 
 ```csharp
-public async Task OnRefreshButtonClickAsync()
+void OnRefreshButtonClick()
 {
     // User clicked refresh - invalidate current page data
     _queryClient.InvalidateQueries(new QueryFilters
     {
         QueryKey = new("currentPage")
     });
+    // Active queries with this key will automatically refetch via OnChange
 }
 ```
 
 ### Background Sync
 
-Invalidate after background sync completes:
+Invalidate after background sync completes. Use `OnChange` to react to the refetch results:
 
 ```csharp
 public class SyncService
 {
     private readonly QueryClient _queryClient;
 
-    public async Task PerformBackgroundSyncAsync()
+    public void PerformBackgroundSync()
     {
-        // Sync data with server
+        // Sync data with server, then invalidate
+        _ = SyncAndInvalidateAsync();
+    }
+
+    private async Task SyncAndInvalidateAsync()
+    {
         await SyncWithServerAsync();
 
         // Invalidate all queries to show fresh data
+        // Active queries will refetch and notify via OnChange
         _queryClient.InvalidateQueries();
     }
 }
-```
-
-## Complete Example: Todo CRUD with Invalidation
-
-```csharp
-public class TodoApp : IDisposable
-{
-    private readonly QueryClient _queryClient;
-    private readonly HttpClient _httpClient;
-    private UseQuery<List<Todo>>? _todosQuery;
-
-    public TodoApp(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-        _queryClient = new QueryClient();
-    }
-
-    public async Task LoadTodosAsync()
-    {
-        _todosQuery = new UseQuery<List<Todo>>(
-            new QueryOptions<List<Todo>>(
-                queryKey: new("todos"),
-                queryFn: async ctx => {
-                    Console.WriteLine("Fetching todos...");
-                    var response = await _httpClient.GetAsync("/api/todos");
-                    return await response.Content.ReadFromJsonAsync<List<Todo>>()
-                           ?? new List<Todo>();
-                },
-                staleTime: TimeSpan.FromMinutes(5)
-            ),
-            _queryClient
-        );
-
-        _todosQuery.OnChange += RenderTodos;
-
-        await _todosQuery.ExecuteAsync();
-    }
-
-    public async Task CreateTodoAsync(string title)
-    {
-        Console.WriteLine($"Creating todo: {title}");
-        
-        // API call
-        var response = await _httpClient.PostAsJsonAsync("/api/todos", 
-            new { title });
-        
-        if (response.IsSuccessStatusCode)
-        {
-            Console.WriteLine("Todo created!");
-            
-            // Invalidate todos query to refetch list
-            _queryClient.InvalidateQueries(new QueryFilters
-            {
-                QueryKey = new("todos")
-            });
-            
-            // Query automatically refetches in background
-            Console.WriteLine("Refreshing todos list...");
-        }
-    }
-
-    public async Task UpdateTodoAsync(int id, string newTitle)
-    {
-        Console.WriteLine($"Updating todo {id}...");
-        
-        var response = await _httpClient.PutAsJsonAsync($"/api/todos/{id}",
-            new { title = newTitle });
-        
-        if (response.IsSuccessStatusCode)
-        {
-            Console.WriteLine("Todo updated!");
-            
-            // Invalidate both list and detail queries
-            _queryClient.InvalidateQueries(new QueryFilters
-            {
-                QueryKey = new("todos") // Matches "todos" and "todos", id
-            });
-        }
-    }
-
-    public async Task DeleteTodoAsync(int id)
-    {
-        Console.WriteLine($"Deleting todo {id}...");
-        
-        var response = await _httpClient.DeleteAsync($"/api/todos/{id}");
-        
-        if (response.IsSuccessStatusCode)
-        {
-            Console.WriteLine("Todo deleted!");
-            
-            // Invalidate all todos queries
-            _queryClient.InvalidateQueries(new QueryFilters
-            {
-                QueryKey = new("todos")
-            });
-        }
-    }
-
-    public void ForceRefreshAll()
-    {
-        Console.WriteLine("Force refreshing all data...");
-        
-        // Invalidate everything
-        _queryClient.InvalidateQueries();
-    }
-
-    private void RenderTodos()
-    {
-        if (_todosQuery == null) return;
-
-        Console.WriteLine("=== Todos ===");
-        
-        if (_todosQuery.IsLoading)
-        {
-            Console.WriteLine("Loading...");
-        }
-        else if (_todosQuery.IsError)
-        {
-            Console.WriteLine($"Error: {_todosQuery.Error?.Message}");
-        }
-        else if (_todosQuery.Data != null)
-        {
-            foreach (var todo in _todosQuery.Data)
-            {
-                Console.WriteLine($"  [{(todo.Done ? "x" : " ")}] {todo.Title}");
-            }
-        }
-
-        if (_todosQuery.IsFetchingBackground)
-        {
-            Console.WriteLine("🔄 Refreshing...");
-        }
-    }
-
-    public void Dispose()
-    {
-        _todosQuery?.Dispose();
-        _queryClient?.Dispose();
-    }
-}
-
-// Models
-public class Todo
-{
-    public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public bool Done { get; set; }
-}
-```
-
-## Best Practices
-
-### 1. **Invalidate After Mutations**
-
-```csharp
-// ✅ Good: Use UseMutation with OnSuccess to invalidate
-var mutation = new UseMutation<Todo, CreateTodoInput>(
-    new MutationOptions<Todo, CreateTodoInput>
-    {
-        MutationFn = async input => await PostTodo(input),
-        OnSuccess = async (data, variables, onMutateResult, context) =>
-        {
-            context.Client.InvalidateQueries(new QueryFilters
-            {
-                QueryKey = new QueryKey("todos")
-            });
-        }
-    },
-    queryClient
-);
-
-// ❌ Bad: Mutate without invalidating
-mutation.Mutate(new CreateTodoInput { Title = "New" });
-// Users see stale data if no OnSuccess invalidation!
-```
-
-### 2. **Use Prefix Matching**
-
-```csharp
-// ✅ Good: Invalidate all related queries
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("todos") // Matches todos, todos/1, todos/list, etc.
-});
-
-// ❌ Bad: Only exact match
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("todos"),
-    Exact = true // Misses todos/1, todos/list
-});
-```
-
-### 3. **Targeted Invalidation**
-
-```csharp
-// ✅ Good: Only invalidate what changed
-await UpdateTodo(id: 5);
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("todos") // Invalidates list and detail
-});
-
-// ❌ Bad: Invalidate everything
-queryClient.InvalidateQueries(); // Also invalidates users, posts, etc.
-```
-
-### 4. **Check Success Before Invalidating**
-
-```csharp
-// ✅ Good: Only invalidate on success
-var response = await httpClient.PostAsync(...);
-if (response.IsSuccessStatusCode)
-{
-    queryClient.InvalidateQueries(new QueryFilters { QueryKey = new("todos") });
-}
-
-// ❌ Bad: Always invalidate
-await httpClient.PostAsync(...);
-queryClient.InvalidateQueries(new QueryFilters { QueryKey = new("todos") });
-// Invalidates even if request failed!
-```
-
-## Comparison with React Query
-
-### React Query (TypeScript):
-```typescript
-// Invalidate all
-queryClient.invalidateQueries()
-
-// Prefix match
-queryClient.invalidateQueries({ queryKey: ['todos'] })
-
-// Exact match
-queryClient.invalidateQueries({ 
-  queryKey: ['todos'], 
-  exact: true 
-})
-
-// Custom predicate
-queryClient.invalidateQueries({
-  predicate: (query) => 
-    query.queryKey[0] === 'todos' && query.queryKey[1]?.version >= 10
-})
-```
-
-### SwrSharp (C#):
-```csharp
-// Invalidate all
-queryClient.InvalidateQueries();
-
-// Prefix match
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("todos") 
-});
-
-// Exact match
-queryClient.InvalidateQueries(new QueryFilters 
-{ 
-    QueryKey = new("todos"),
-    Exact = true
-});
-
-// Custom predicate
-queryClient.InvalidateQueries(new QueryFilters
-{
-    Predicate = key => {
-        if (key.Parts[0]?.ToString() != "todos") return false;
-        var versionObj = key.Parts[1];
-        var version = (int?)versionObj?.GetType()
-                          .GetProperty("version")?.GetValue(versionObj);
-        return version >= 10;
-    }
-});
 ```
