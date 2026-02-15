@@ -107,6 +107,7 @@ public class UseQuery<T> : IDisposable
     private readonly Action<bool> _focusChangedHandler;
     private CancellationTokenSource? _staleTimerCts;
     private CancellationTokenSource? _refetchIntervalCts;
+    private readonly QueryClient.ActiveQueryInfo _activeQueryInfo;
     
     /// <summary>
     /// Used to pause/resume retry when network goes offline/online during fetch
@@ -127,6 +128,13 @@ public class UseQuery<T> : IDisposable
         _onlineManager = client.OnlineManager;
         FetchStatus = FetchStatus.Idle;
 
+        // Register as an active query for Type/FetchStatus/Stale filtering
+        _activeQueryInfo = new QueryClient.ActiveQueryInfo
+        {
+            GetFetchStatus = () => _fetchStatus,
+            StaleTime = _queryOptions.StaleTime
+        };
+        _client.RegisterActiveQuery(_queryOptions.QueryKey, _activeQueryInfo);
 
         // Resolve QueryFn: use provided queryFn or fallback to type-safe default
         if (_queryOptions.QueryFn == null)
@@ -227,6 +235,9 @@ public class UseQuery<T> : IDisposable
         // Subscribe to query cancellation events
         _client.OnQueriesCancelled += HandleQueriesCancelled;
 
+        // Subscribe to query refetch events
+        _client.OnQueriesRefetched += HandleQueriesRefetched;
+
         // Handle initial data and placeholder data
         InitializeWithData();
 
@@ -296,6 +307,27 @@ public class UseQuery<T> : IDisposable
                 _queryOptions.QueryKey
             );
             // Don't propagate - this is called from an event handler
+        }
+    }
+
+    private void HandleQueriesRefetched(List<QueryKey> refetchedKeys)
+    {
+        try
+        {
+            if (!refetchedKeys.Contains(_queryOptions.QueryKey)) return;
+
+            if (_queryOptions.Enabled)
+            {
+                _ = RefetchAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _client.Logger.LogError(
+                ex,
+                "Error handling query refetch for: {QueryKey}",
+                _queryOptions.QueryKey
+            );
         }
     }
 
@@ -916,15 +948,21 @@ public class UseQuery<T> : IDisposable
         {
             if (_queryOptions.NetworkMode != NetworkMode.Always || _queryOptions.RefetchOnReconnect)
                 _onlineManager.OnlineStatusChanged -= _onlineStatusHandler;
-            
+
             if (_queryOptions.RefetchOnWindowFocus)
                 _client.FocusManager.FocusChanged -= _focusChangedHandler;
-            
+
             // Unsubscribe from invalidation events
             _client.OnQueriesInvalidated -= HandleQueriesInvalidated;
-            
+
             // Unsubscribe from cancellation events
             _client.OnQueriesCancelled -= HandleQueriesCancelled;
+
+            // Unsubscribe from refetch events
+            _client.OnQueriesRefetched -= HandleQueriesRefetched;
+
+            // Unregister as active query
+            _client.UnregisterActiveQuery(_queryOptions.QueryKey, _activeQueryInfo);
         }
         catch
         {

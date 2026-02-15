@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Core", "src\SwrSha
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Doc", "docs\SwrSharp.Doc\SwrSharp.Doc.csproj", "{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Blazor", "src\SwrSharp.Blazor\SwrSharp.Blazor.csproj", "{8663375C-D500-48EF-AA6B-4BBE471B6434}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{20CB6C85-3CA8-4EC3-B4C6-2070A00B222D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -42,6 +48,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{5367E163-430E-45C9-9F6B-FF86C7A61A94} = {5AE1F2F2-81AA-4A7E-A6C8-FE5EE0A6E2E3}
 		{B649718C-8972-B9FF-ED7C-C1BEA841321C} = {42A76C2E-56FA-4C45-93DC-301ADF74864A}
+		{8663375C-D500-48EF-AA6B-4BBE471B6434} = {42A76C2E-56FA-4C45-93DC-301ADF74864A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FC9CA5D2-E3C4-48BE-839F-E71C399C967E}

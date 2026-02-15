@@ -29,6 +29,37 @@ public class QueryClient : IDisposable
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _scopeSemaphores = new();
 
     /// <summary>
+    /// Tracks active query observers for Type/FetchStatus/Stale filtering.
+    /// </summary>
+    private readonly ConcurrentDictionary<QueryKey, List<ActiveQueryInfo>> _activeQueries = new();
+
+    internal class ActiveQueryInfo
+    {
+        public Func<FetchStatus> GetFetchStatus { get; set; } = () => FetchStatus.Idle;
+        public TimeSpan StaleTime { get; set; }
+    }
+
+    internal void RegisterActiveQuery(QueryKey key, ActiveQueryInfo info)
+    {
+        _activeQueries.AddOrUpdate(key,
+            _ => new List<ActiveQueryInfo> { info },
+            (_, list) => { lock (list) { list.Add(info); } return list; });
+    }
+
+    internal void UnregisterActiveQuery(QueryKey key, ActiveQueryInfo info)
+    {
+        if (_activeQueries.TryGetValue(key, out var list))
+        {
+            lock (list)
+            {
+                list.Remove(info);
+                if (list.Count == 0)
+                    _activeQueries.TryRemove(key, out _);
+            }
+        }
+    }
+
+    /// <summary>
     /// Sets a type-specific default query function.
     /// This provides type-safe default fetching without runtime casts.
     /// </summary>
@@ -251,6 +282,52 @@ public class QueryClient : IDisposable
     }
 
     /// <summary>
+    /// Returns cache keys matching the given filters using context-aware matching.
+    /// </summary>
+    private List<QueryKey> GetMatchingKeys(QueryFilters filters)
+    {
+        return _cache.Keys
+            .Where(key =>
+            {
+                var entry = _cache.TryGetValue(key, out var e) ? e : null;
+                var isActive = _activeQueries.ContainsKey(key);
+                FetchStatus? fetchStatus = null;
+                if (_activeQueries.TryGetValue(key, out var infos))
+                {
+                    lock (infos)
+                    {
+                        if (infos.Count > 0)
+                            fetchStatus = infos[0].GetFetchStatus();
+                    }
+                }
+                // Determine staleness
+                bool? isStale = null;
+                if (entry != null)
+                {
+                    if (_activeQueries.TryGetValue(key, out var staleInfos))
+                    {
+                        lock (staleInfos)
+                        {
+                            if (staleInfos.Count > 0)
+                            {
+                                var staleTime = staleInfos[0].StaleTime;
+                                isStale = staleTime <= TimeSpan.Zero ||
+                                    (DateTime.UtcNow - entry.FetchTime) > staleTime;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // No active observer - consider stale (staleTime=0 default)
+                        isStale = true;
+                    }
+                }
+                return filters.MatchesWithContext(key, entry, isActive, fetchStatus, isStale);
+            })
+            .ToList();
+    }
+
+    /// <summary>
     /// Invalidates queries matching the filters.
     /// Marks them as stale and triggers refetch if they are currently active.
     /// </summary>
@@ -262,9 +339,7 @@ public class QueryClient : IDisposable
         try
         {
             // Find all matching cache entries
-            var keysToInvalidate = _cache.Keys
-                .Where(key => filters.Matches(key))
-                .ToList();
+            var keysToInvalidate = GetMatchingKeys(filters);
 
             Logger.LogInformation(
                 "Invalidating {Count} queries. Filter: QueryKey={QueryKey}, Exact={Exact}, Type={Type}",
@@ -327,9 +402,7 @@ public class QueryClient : IDisposable
         try
         {
             // Find all matching cache entries
-            var keysToCancel = _cache.Keys
-                .Where(key => filters.Matches(key))
-                .ToList();
+            var keysToCancel = GetMatchingKeys(filters);
 
             Logger.LogInformation(
                 "Cancelling {Count} queries. Filter: QueryKey={QueryKey}, Silent={Silent}, Revert={Revert}",
@@ -385,6 +458,123 @@ public class QueryClient : IDisposable
     }
 
     /// <summary>
+    /// Event fired when queries should be refetched.
+    /// Active queries subscribe to handle refetch.
+    /// </summary>
+    public event Action<List<QueryKey>>? OnQueriesRefetched;
+
+    /// <summary>
+    /// Refetches queries matching the filters.
+    /// Only active queries will actually refetch.
+    /// </summary>
+    /// <param name="filters">Optional filters to match specific queries. If null, refetches all queries.</param>
+    public void RefetchQueries(QueryFilters? filters = null)
+    {
+        filters ??= new QueryFilters();
+
+        var keysToRefetch = GetMatchingKeys(filters);
+
+        Logger.LogInformation(
+            "Refetching {Count} queries. Filter: QueryKey={QueryKey}",
+            keysToRefetch.Count,
+            filters.QueryKey?.ToString() ?? "null"
+        );
+
+        OnQueriesRefetched?.Invoke(keysToRefetch);
+    }
+
+    /// <summary>
+    /// Removes queries matching the filters from the cache.
+    /// </summary>
+    /// <param name="filters">Optional filters to match specific queries. If null, removes all queries.</param>
+    public void RemoveQueries(QueryFilters? filters = null)
+    {
+        filters ??= new QueryFilters();
+
+        var keysToRemove = GetMatchingKeys(filters);
+
+        Logger.LogInformation(
+            "Removing {Count} queries. Filter: QueryKey={QueryKey}",
+            keysToRemove.Count,
+            filters.QueryKey?.ToString() ?? "null"
+        );
+
+        foreach (var key in keysToRemove)
+        {
+            _cache.TryRemove(key, out _);
+        }
+    }
+
+    /// <summary>
+    /// Resets queries matching the filters to their initial state.
+    /// Clears data and error, then triggers refetch for active queries.
+    /// </summary>
+    /// <param name="filters">Optional filters to match specific queries. If null, resets all queries.</param>
+    public void ResetQueries(QueryFilters? filters = null)
+    {
+        filters ??= new QueryFilters();
+
+        var keysToReset = GetMatchingKeys(filters);
+
+        Logger.LogInformation(
+            "Resetting {Count} queries. Filter: QueryKey={QueryKey}",
+            keysToReset.Count,
+            filters.QueryKey?.ToString() ?? "null"
+        );
+
+        foreach (var key in keysToReset)
+        {
+            _cache.TryRemove(key, out _);
+        }
+
+        // Trigger refetch for active queries so they re-initialize
+        OnQueriesInvalidated?.Invoke(keysToReset);
+    }
+
+    /// <summary>
+    /// Returns the count of queries matching the filters that are currently fetching.
+    /// </summary>
+    /// <param name="filters">Optional filters to match specific queries. If null, counts all fetching queries.</param>
+    /// <returns>The number of matching queries with FetchStatus.Fetching.</returns>
+    public int GetFetchingCount(QueryFilters? filters = null)
+    {
+        filters ??= new QueryFilters();
+
+        int count = 0;
+        foreach (var kvp in _activeQueries)
+        {
+            var key = kvp.Key;
+            var infos = kvp.Value;
+
+            // Check if this key exists in cache (it should for active queries)
+            var entry = _cache.TryGetValue(key, out var e) ? e : null;
+            var isActive = true; // It's in _activeQueries so it's active
+            FetchStatus? fetchStatus = null;
+            bool? isStale = null;
+
+            lock (infos)
+            {
+                if (infos.Count == 0) continue;
+                fetchStatus = infos[0].GetFetchStatus();
+
+                if (entry != null)
+                {
+                    var staleTime = infos[0].StaleTime;
+                    isStale = staleTime <= TimeSpan.Zero ||
+                        (DateTime.UtcNow - entry.FetchTime) > staleTime;
+                }
+            }
+
+            if (fetchStatus != FetchStatus.Fetching) continue;
+
+            if (filters.MatchesWithContext(key, entry, isActive, fetchStatus, isStale))
+                count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>
     /// Gets or creates a semaphore for serializing mutations within the same scope.
     /// </summary>
     internal SemaphoreSlim GetScopeSemaphore(string scopeId)
@@ -395,6 +585,7 @@ public class QueryClient : IDisposable
     public void Dispose()
     {
         _cache.Clear();
+        _activeQueries.Clear();
         foreach (var semaphore in _scopeSemaphores.Values)
         {
             semaphore.Dispose();
