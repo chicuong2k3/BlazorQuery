@@ -7,154 +7,103 @@ category: "Guides"
 
 # Dependent Queries
 
-Dependent (or serial) queries depend on previous ones to finish before they can execute. This creates a request chain where each query waits for the previous one to complete.
+Dependent (or serial) queries depend on previous ones to finish before they can execute. This is done **reactively** — you subscribe to `OnChange` and trigger dependent queries when data becomes available, allowing your application to handle intermediate loading states.
 
-## Basic Dependent Query with `enabled`
+## Basic Dependent Query
 
-To create a dependent query, use the `enabled` option to tell a query when it is ready to run:
-
+Use the `OnChange` event to reactively trigger a dependent query when the first one completes:
 
 ```csharp
-// Both queries created at component initialization
-// At this point, userId is NOT yet available
-
-string? userId = null; // Will be set later
-
-var userOptions = new QueryOptions<User>(
-    queryKey: new("user", email),
-    queryFn: async ctx => await GetUserByEmailAsync(email)
+var userQuery = new UseQuery<User>(
+    new QueryOptions<User>(
+        queryKey: new("user", email),
+        queryFn: async ctx => await GetUserByEmailAsync(email)
+    ),
+    queryClient
 );
 
-var projectsOptions = new QueryOptions<List<Project>>(
-    queryKey: new("projects", userId),
-    queryFn: async ctx => await GetProjectsByUserAsync(userId!),
-    enabled: false // Initially disabled — userId not ready
-);
+UseQuery<List<Project>>? projectsQuery = null;
 
-var userQuery = new UseQuery<User>(userOptions, queryClient);
-var projectsQuery = new UseQuery<List<Project>>(projectsOptions, queryClient);
-
-// Subscribe to changes reactively
-userQuery.OnChange += async () => {
+userQuery.OnChange += () =>
+{
     if (userQuery.IsSuccess && userQuery.Data != null)
     {
-        userId = userQuery.Data.Id;
-        projectsOptions.Enabled = true; // NOW enable it
-        await projectsQuery.ExecuteAsync();
+        var userId = userQuery.Data.Id;
+
+        // Dispose previous dependent query if exists
+        projectsQuery?.Dispose();
+
+        projectsQuery = new UseQuery<List<Project>>(
+            new QueryOptions<List<Project>>(
+                queryKey: new("projects", userId),
+                queryFn: async ctx => await GetProjectsByUserAsync(userId)
+            ),
+            queryClient
+        );
+
+        projectsQuery.OnChange += () =>
+        {
+            // Notify your UI framework to re-render
+        };
+
+        _ = projectsQuery.ExecuteAsync();
     }
+
+    // Notify your UI framework to re-render
 };
 
-// Start loading user
-await userQuery.ExecuteAsync();
-// projectsQuery will be triggered by OnChange when user is ready
+_ = userQuery.ExecuteAsync();
 ```
+
+The key pattern: create the dependent query **inside** the `OnChange` handler of the first query, only when its data is available. This ensures the query key and query function use the correct dependency value.
 
 ## Query State Transitions
 
-The `projects` query will start in:
+The dependent query goes through these states:
 
-```csharp
-Status: QueryStatus.Pending
-IsPending: true
-FetchStatus: FetchStatus.Idle
+```
+(not created yet)         — first query is still loading
+    ↓
+Pending + Fetching        — first query completed, dependent query fetching
+    ↓
+Success + Idle            — dependent query loaded
 ```
 
-As soon as the `user` is available and you enable the query, it will transition to:
+Your application can inspect these states at any time to render the appropriate UI:
 
 ```csharp
-Status: QueryStatus.Pending
-IsPending: true
-FetchStatus: FetchStatus.Fetching
-```
-
-Once we have the projects, it will go to:
-
-```csharp
-Status: QueryStatus.Success
-IsPending: false
-FetchStatus: FetchStatus.Idle
-```
-
-## Complete Example: User → Projects
-
-```csharp
-public class UserProjectsComponent : IDisposable
+if (userQuery.IsLoading)
 {
-    private readonly QueryClient _queryClient;
-    private UseQuery<User>? _userQuery;
-    private UseQuery<List<Project>>? _projectsQuery;
-
-    public UserProjectsComponent(QueryClient queryClient)
+    // Show user loading state
+}
+else if (userQuery.IsError)
+{
+    // Show error
+}
+else if (userQuery.IsSuccess)
+{
+    // User loaded — check dependent query
+    if (projectsQuery == null || projectsQuery.IsLoading)
     {
-        _queryClient = queryClient;
+        // Show projects loading state
     }
-
-    public async Task LoadUserAndProjectsAsync(string email)
+    else if (projectsQuery.IsSuccess)
     {
-        // Step 1: Fetch user
-        _userQuery = new UseQuery<User>(
-            new QueryOptions<User>(
-                queryKey: new("user", email),
-                queryFn: async ctx => {
-                    var (queryKey, signal) = ctx;
-                    var userEmail = (string)queryKey[1]!;
-                    return await _api.GetUserByEmailAsync(userEmail, signal);
-                }
-            ),
-            _queryClient
-        );
-
-        await _userQuery.ExecuteAsync();
-
-        if (!_userQuery.IsSuccess)
-        {
-            Console.WriteLine($"Failed to load user: {_userQuery.Error?.Message}");
-            return;
-        }
-
-        var userId = _userQuery.Data!.Id;
-        Console.WriteLine($"User loaded: {_userQuery.Data.Name}");
-
-        // Step 2: Fetch projects (depends on userId)
-        _projectsQuery = new UseQuery<List<Project>>(
-            new QueryOptions<List<Project>>(
-                queryKey: new("projects", userId),
-                queryFn: async ctx => {
-                    var (queryKey, signal) = ctx;
-                    var uid = (string)queryKey[1]!;
-                    return await _api.GetProjectsByUserAsync(uid, signal);
-                },
-                enabled: !string.IsNullOrEmpty(userId)
-            ),
-            _queryClient
-        );
-
-        await _projectsQuery.ExecuteAsync();
-
-        if (_projectsQuery.IsSuccess)
-        {
-            Console.WriteLine($"Loaded {_projectsQuery.Data!.Count} projects");
-        }
-    }
-
-    public void Dispose()
-    {
-        _userQuery?.Dispose();
-        _projectsQuery?.Dispose();
+        // Both loaded — use projectsQuery.Data
     }
 }
 ```
 
 ## Dependent Queries with UseQueries
 
-Dynamic parallel queries with `UseQueries` can also depend on a previous query:
+When the first query returns a list of IDs, you can fan out into parallel dependent queries using `UseQueries`:
 
 ```csharp
-// Step 1: Get the user IDs
 var usersQuery = new UseQuery<List<string>>(
     new QueryOptions<List<string>>(
         queryKey: new("users"),
-        queryFn: async ctx => {
+        queryFn: async ctx =>
+        {
             var users = await GetUsersDataAsync();
             return users.Select(u => u.Id).ToList();
         }
@@ -162,123 +111,48 @@ var usersQuery = new UseQuery<List<string>>(
     queryClient
 );
 
-await usersQuery.ExecuteAsync();
-var userIds = usersQuery.Data;
+UseQueries<List<Message>>? messagesQueries = null;
 
-// Step 2: Get messages for each user (dependent)
-var messagesQueries = new UseQueries<List<Message>>(queryClient);
-
-var queries = userIds != null
-    ? userIds.Select(id =>
-        new QueryOptions<List<Message>>(
-            queryKey: new("messages", id),
-            queryFn: async ctx => {
-                var (queryKey, signal) = ctx;
-                var userId = (string)queryKey[1]!;
-                return await GetMessagesByUserAsync(userId, signal);
-            }
-        ))
-    : Enumerable.Empty<QueryOptions<List<Message>>>();
-
-messagesQueries.SetQueries(queries);
-await messagesQueries.ExecuteAllAsync();
-
-// Access results
-foreach (var query in messagesQueries.Queries)
+usersQuery.OnChange += () =>
 {
-    if (query.IsSuccess)
+    if (usersQuery.IsSuccess && usersQuery.Data != null)
     {
-        Console.WriteLine($"User has {query.Data!.Count} messages");
-    }
-}
-```
-
-**Note**: If `userIds` is null or empty, an empty array will be passed to `SetQueries()`, and no queries will execute.
-
-## Dynamic Enable/Disable
-
-You can dynamically change the `Enabled` state. Since `UseQuery` holds a reference to the options object, changes are reflected immediately:
-
-```csharp
-var options = new QueryOptions<Data>(
-    queryKey: new("data"),
-    queryFn: async ctx => await FetchDataAsync(),
-    enabled: false // Initially disabled
-);
-
-var query = new UseQuery<Data>(options, queryClient);
-
-// Query won't execute because enabled = false
-await query.ExecuteAsync(); // Does nothing
-
-// Later, when condition is met, enable it
-if (someDependencyIsReady)
-{
-    options.Enabled = true; // Same options object
-    await query.ExecuteAsync(); // Now executes!
-}
-```
-
-> **Note**: `UseQuery` holds a reference to the `QueryOptions` object, so changes to `Enabled` 
-> are immediately visible to the query.
-
-## Reactive Pattern with Events
-
-For a more reactive approach, you can use events to automatically trigger dependent queries:
-
-```csharp
-public class ReactiveLoadingComponent
-{
-    private readonly QueryClient _queryClient;
-    private UseQuery<User>? _userQuery;
-    private UseQuery<List<Project>>? _projectsQuery;
-
-    public async Task LoadDataAsync(string email)
-    {
-        // Create user query
-        _userQuery = new UseQuery<User>(
-            new QueryOptions<User>(
-                queryKey: new("user", email),
-                queryFn: async ctx => await GetUserAsync(email)
-            ),
-            _queryClient
-        );
-
-        // Subscribe to user query changes
-        _userQuery.OnChange += async () => {
-            if (_userQuery.IsSuccess && _userQuery.Data != null)
-            {
-                await LoadProjectsAsync(_userQuery.Data.Id);
-            }
+        messagesQueries?.Dispose();
+        messagesQueries = new UseQueries<List<Message>>(queryClient);
+        messagesQueries.OnChange += () =>
+        {
+            // Notify your UI framework to re-render
         };
 
-        // Start loading
-        await _userQuery.ExecuteAsync();
-    }
-
-    private async Task LoadProjectsAsync(string userId)
-    {
-        _projectsQuery = new UseQuery<List<Project>>(
-            new QueryOptions<List<Project>>(
-                queryKey: new("projects", userId),
-                queryFn: async ctx => await GetProjectsAsync(userId),
-                enabled: true
-            ),
-            _queryClient
+        var queries = usersQuery.Data.Select(id =>
+            new QueryOptions<List<Message>>(
+                queryKey: new("messages", id),
+                queryFn: async ctx => await GetMessagesByUserAsync(id, ctx.Signal)
+            )
         );
 
-        await _projectsQuery.ExecuteAsync();
+        messagesQueries.SetQueries(queries);
+        _ = messagesQueries.ExecuteAllAsync();
     }
-}
+
+    // Notify your UI framework to re-render
+};
+
+_ = usersQuery.ExecuteAsync();
 ```
 
-## Multiple Dependencies
+If `usersQuery.Data` is null or empty, no dependent queries will be created.
 
-You can chain multiple dependent queries:
+## Multiple Dependencies (Chained)
+
+For chains of 3+ queries, use the same reactive pattern with nested `OnChange` handlers:
 
 ```csharp
-// Query 1: Get user
-var userQuery = new UseQuery<User>(
+UseQuery<User>? userQuery = null;
+UseQuery<Organization>? orgQuery = null;
+UseQuery<Team>? teamQuery = null;
+
+userQuery = new UseQuery<User>(
     new QueryOptions<User>(
         queryKey: new("user", userId),
         queryFn: async ctx => await GetUserAsync(userId)
@@ -286,40 +160,69 @@ var userQuery = new UseQuery<User>(
     queryClient
 );
 
-await userQuery.ExecuteAsync();
-var organizationId = userQuery.Data?.OrganizationId;
+userQuery.OnChange += () =>
+{
+    var orgId = userQuery.Data?.OrganizationId;
+    if (userQuery.IsSuccess && !string.IsNullOrEmpty(orgId))
+    {
+        orgQuery?.Dispose();
+        orgQuery = new UseQuery<Organization>(
+            new QueryOptions<Organization>(
+                queryKey: new("organization", orgId),
+                queryFn: async ctx => await GetOrganizationAsync(orgId)
+            ),
+            queryClient
+        );
 
-// Query 2: Get organization (depends on user)
-var orgQuery = new UseQuery<Organization>(
-    new QueryOptions<Organization>(
-        queryKey: new("organization", organizationId),
-        queryFn: async ctx => await GetOrganizationAsync(organizationId!),
-        enabled: !string.IsNullOrEmpty(organizationId)
-    ),
-    queryClient
-);
+        orgQuery.OnChange += () =>
+        {
+            var teamId = orgQuery.Data?.DefaultTeamId;
+            if (orgQuery.IsSuccess && !string.IsNullOrEmpty(teamId))
+            {
+                teamQuery?.Dispose();
+                teamQuery = new UseQuery<Team>(
+                    new QueryOptions<Team>(
+                        queryKey: new("team", teamId),
+                        queryFn: async ctx => await GetTeamAsync(teamId)
+                    ),
+                    queryClient
+                );
 
-await orgQuery.ExecuteAsync();
-var teamId = orgQuery.Data?.DefaultTeamId;
+                teamQuery.OnChange += () => { /* notify UI */ };
+                _ = teamQuery.ExecuteAsync();
+            }
 
-// Query 3: Get team (depends on organization)
-var teamQuery = new UseQuery<Team>(
-    new QueryOptions<Team>(
-        queryKey: new("team", teamId),
-        queryFn: async ctx => await GetTeamAsync(teamId!),
-        enabled: !string.IsNullOrEmpty(teamId)
-    ),
-    queryClient
-);
+            // notify UI
+        };
 
-await teamQuery.ExecuteAsync();
+        _ = orgQuery.ExecuteAsync();
+    }
 
-// Now you have user → organization → team
+    // notify UI
+};
+
+_ = userQuery.ExecuteAsync();
+
+// Cleanup
+// userQuery.Dispose(); orgQuery?.Dispose(); teamQuery?.Dispose();
+```
+
+Your application can render each stage incrementally by checking the state of each query:
+
+```csharp
+if (userQuery.IsLoading)
+    // "Loading user..."
+else if (userQuery.IsSuccess && orgQuery?.IsLoading == true)
+    // "User: {name}, loading organization..."
+else if (orgQuery?.IsSuccess == true && teamQuery?.IsLoading == true)
+    // "Org: {name}, loading team..."
+else if (teamQuery?.IsSuccess == true)
+    // "Team: {name}" — all data ready
 ```
 
 ## Performance Note: Request Waterfalls
 
-⚠️ **Important**: Dependent queries create [request waterfalls](https://tanstack.com/query/latest/docs/framework/react/guides/request-waterfalls), which can hurt performance.
+**Important**: Dependent queries create request waterfalls, which can hurt performance.
 
 If both queries take the same amount of time, doing them serially instead of in parallel always takes **twice as much time**. This is especially problematic on high-latency connections.
 
@@ -327,12 +230,12 @@ If both queries take the same amount of time, doing them serially instead of in 
 
 Instead of:
 ```
-Client → GetUserByEmail(email) → GetProjectsByUser(userId)
+Client -> GetUserByEmail(email) -> GetProjectsByUser(userId)
 ```
 
 Consider creating a combined endpoint:
 ```
-Client → GetProjectsByUserEmail(email)
+Client -> GetProjectsByUserEmail(email)
 ```
 
 This flattens the waterfall and improves performance significantly.
@@ -344,69 +247,3 @@ Dependent queries are acceptable when:
 - The queries are fast (low latency)
 - The dependency is a local condition (not network data)
 - User experience benefits from incremental loading
-
-## Best Practices
-
-### 1. **Use Meaningful Enabled Conditions**
-
-```csharp
-// Good: Clear dependency
-enabled: !string.IsNullOrEmpty(userId)
-
-// Good: Multiple conditions
-enabled: userId != null && isUserActive
-
-// Avoid: Complex logic that's hard to understand
-enabled: (userId?.Length ?? 0) > 0 && !(userId?.StartsWith("temp") ?? true)
-```
-
-### 2. **Handle Loading States**
-
-```csharp
-if (userQuery.IsLoading)
-{
-    // Show user loading spinner
-}
-else if (userQuery.IsError)
-{
-    // Show error
-}
-else if (userQuery.IsSuccess && projectsQuery.IsLoading)
-{
-    // Show "user loaded, loading projects..."
-}
-```
-
-### 3. **Cache Dependent Queries**
-
-```csharp
-var projectsQuery = new UseQuery<List<Project>>(
-    new QueryOptions<List<Project>>(
-        queryKey: new("projects", userId),
-        queryFn: async ctx => await GetProjectsAsync(userId!),
-        enabled: !string.IsNullOrEmpty(userId),
-        staleTime: TimeSpan.FromMinutes(5) // Cache for 5 minutes
-    ),
-    queryClient
-);
-```
-
-### 4. **Consider Optimistic Loading**
-
-If you know the dependency will likely be available, you can start preparing:
-
-```csharp
-// Pre-create the dependent query (disabled)
-var projectsQuery = new UseQuery<List<Project>>(
-    new QueryOptions<List<Project>>(
-        queryKey: new("projects", expectedUserId),
-        queryFn: async ctx => await GetProjectsAsync(expectedUserId),
-        enabled: false
-    ),
-    queryClient
-);
-
-// Later enable it
-projectsOptions.Enabled = true;
-await projectsQuery.ExecuteAsync();
-```
