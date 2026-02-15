@@ -1,0 +1,75 @@
+@page "/samples/placeholder-data"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Placeholder Query Data</PageTitle>
+
+<h1>Placeholder Query Data</h1>
+<p><code>PlaceholderData</code> is NOT persisted to cache. It shows temporary data while the real fetch happens.</p>
+
+<h4>With Placeholder</h4>
+@if (_query.IsSuccess)
+{
+    <div class="alert @(_query.IsPlaceholderData ? "alert-warning" : "alert-success")">
+        @if (_query.IsPlaceholderData)
+        {
+            <span class="badge bg-warning me-2">Placeholder</span>
+        }
+        @_query.Data
+    </div>
+}
+else if (_query.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+
+<h4>PlaceholderDataFunc (dynamic)</h4>
+<p>Select an item to see placeholder data derived from previously cached data:</p>
+<div class="mb-2">
+    <button class="btn btn-sm btn-outline-primary me-1" @onclick='() => _selectedId = "A"'>Item A</button>
+    <button class="btn btn-sm btn-outline-primary me-1" @onclick='() => _selectedId = "B"'>Item B</button>
+    <button class="btn btn-sm btn-outline-primary" @onclick='() => _selectedId = "C"'>Item C</button>
+</div>
+@if (_detail.IsSuccess)
+{
+    <div class="alert @(_detail.IsPlaceholderData ? "alert-warning" : "alert-info")">
+        @if (_detail.IsPlaceholderData)
+        {
+            <span class="badge bg-warning me-2">Placeholder</span>
+        }
+        @_detail.Data
+    </div>
+}
+else if (_detail.IsPending)
+{
+    <p><em>Loading item @_selectedId...</em></p>
+}
+
+@code {
+    private UseQuery<string> _query = null!;
+    private UseQuery<string> _detail = null!;
+    private string _selectedId = "A";
+
+    protected override void OnParametersSet()
+    {
+        _query = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("placeholder-basic"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(1500);
+                return $"Real data loaded at {DateTime.Now:T}";
+            },
+            placeholderData: "Temporary placeholder while loading..."
+        ));
+
+        _detail = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("item", _selectedId),
+            queryFn: async _ =>
+            {
+                await Task.Delay(800);
+                return $"Details for Item {_selectedId}: loaded at {DateTime.Now:T}";
+            },
+            placeholderDataFunc: (previousData, _) =>
+                previousData != null ? $"[Showing previous: {previousData}]" : null
+        ));
+    }
+}

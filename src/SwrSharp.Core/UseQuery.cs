@@ -568,7 +568,7 @@ public class UseQuery<T> : IDisposable
             return;
         }
 
-        await _fetchLock.WaitAsync();
+        try { await _fetchLock.WaitAsync(); } catch (ObjectDisposedException) { return; }
         CancellationTokenSource? linkedCts = null;
 
         try
@@ -838,7 +838,7 @@ public class UseQuery<T> : IDisposable
             }
 
             linkedCts?.Dispose();
-            _fetchLock.Release();
+            try { _fetchLock.Release(); } catch (ObjectDisposedException) { }
             OnChange?.Invoke();
         }
     }

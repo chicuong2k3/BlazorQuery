@@ -1,0 +1,106 @@
+@page "/samples/logging"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Logging & Error Handling</PageTitle>
+
+<h1>Logging & Error Handling</h1>
+<p>Attach a custom <code>IQueryLogger</code> to the QueryClient for debugging and audit logs.</p>
+
+<h4>Enable Logging</h4>
+<button class="btn btn-outline-primary mb-3" @onclick="EnableLogging">
+    @(_logger != null ? "Logging enabled" : "Enable Logger")
+</button>
+
+<h4>Actions</h4>
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-outline-primary" @onclick="() => _query.RefetchAsync()">Refetch Query</button>
+    <button class="btn btn-outline-warning" @onclick="InvalidateQuery">Invalidate Query</button>
+    <button class="btn btn-outline-danger" @onclick="FetchFailing">Fetch Failing Query</button>
+</div>
+
+@if (_query.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_query.IsSuccess)
+{
+    <div class="alert alert-success">@_query.Data</div>
+}
+else if (_query.IsError)
+{
+    <div class="alert alert-danger">@_query.Error?.Message</div>
+}
+
+<h4>Log Output</h4>
+<div class="border rounded p-2 bg-dark text-light" style="max-height:300px;overflow-y:auto;font-size:0.8rem;font-family:monospace">
+    @if (_logger == null)
+    {
+        <p class="text-muted">Enable logging to see output here</p>
+    }
+    else
+    {
+        @foreach (var entry in _logger.Entries)
+        {
+            <div class="@(entry.StartsWith("[ERR") ? "text-danger" : entry.StartsWith("[WRN") ? "text-warning" : "text-info")">@entry</div>
+        }
+    }
+</div>
+
+@code {
+    private UseQuery<string> _query = null!;
+    private InMemoryLogger? _logger;
+
+    protected override void OnParametersSet()
+    {
+        _query = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("log-demo"),
+            queryFn: async _ => { await Task.Delay(300); return $"Data at {DateTime.Now:T}"; },
+            staleTime: TimeSpan.FromSeconds(10)
+        ));
+    }
+
+    private void EnableLogging()
+    {
+        _logger = new InMemoryLogger();
+        QueryClient.Logger = _logger;
+    }
+
+    private void InvalidateQuery()
+    {
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("log-demo") });
+    }
+
+    private async Task FetchFailing()
+    {
+        try
+        {
+            await QueryClient.PrefetchQueryAsync(new QueryOptions<string>(
+                queryKey: new QueryKey("log-fail"),
+                queryFn: async _ => { await Task.Delay(100); throw new Exception("Simulated failure"); },
+                retry: 0
+            ));
+        }
+        catch { /* expected */ }
+        StateHasChanged();
+    }
+
+    private class InMemoryLogger : IQueryLogger
+    {
+        public List<string> Entries { get; } = new();
+
+        public void LogInformation(string message, params object[] args) =>
+            Entries.Insert(0, $"[INF] {string.Format(message, args)}");
+
+        public void LogWarning(string message, params object[] args) =>
+            Entries.Insert(0, $"[WRN] {string.Format(message, args)}");
+
+        public void LogError(Exception ex, string message, params object[] args) =>
+            Entries.Insert(0, $"[ERR] {string.Format(message, args)}: {ex.Message}");
+
+        public void LogDebug(string message, params object[] args) =>
+            Entries.Insert(0, $"[DBG] {string.Format(message, args)}");
+
+        public void LogCritical(Exception ex, string message, params object[] args) =>
+            Entries.Insert(0, $"[CRT] {string.Format(message, args)}: {ex.Message}");
+    }
+}

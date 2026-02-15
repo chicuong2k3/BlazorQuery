@@ -1,0 +1,123 @@
+@page "/samples/network-mode"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Network Mode</PageTitle>
+
+<h1>Network Mode</h1>
+<p>Demonstrates the three network modes: <code>Online</code>, <code>Always</code>, and <code>OfflineFirst</code>.</p>
+
+<h4>Simulate Network</h4>
+<div class="mb-3">
+    <button class="btn @(_isOnline ? "btn-success" : "btn-danger")" @onclick="ToggleNetwork">
+        Network: @(_isOnline ? "Online" : "Offline")
+    </button>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">NetworkMode.Online</div>
+            <div class="card-body">
+                @if (_onlineQuery.IsPaused)
+                {
+                    <span class="badge bg-warning">Paused (offline)</span>
+                }
+                else if (_onlineQuery.IsPending)
+                {
+                    <em>Loading...</em>
+                }
+                else if (_onlineQuery.IsSuccess)
+                {
+                    <span>@_onlineQuery.Data</span>
+                }
+                else if (_onlineQuery.IsError)
+                {
+                    <span class="text-danger">@_onlineQuery.Error?.Message</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">NetworkMode.Always</div>
+            <div class="card-body">
+                @if (_alwaysQuery.IsPending)
+                {
+                    <em>Loading...</em>
+                }
+                else if (_alwaysQuery.IsSuccess)
+                {
+                    <span>@_alwaysQuery.Data</span>
+                }
+                else if (_alwaysQuery.IsError)
+                {
+                    <span class="text-danger">@_alwaysQuery.Error?.Message</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">NetworkMode.OfflineFirst</div>
+            <div class="card-body">
+                @if (_offlineFirstQuery.IsPending)
+                {
+                    <em>Loading...</em>
+                }
+                else if (_offlineFirstQuery.IsSuccess)
+                {
+                    <span>@_offlineFirstQuery.Data</span>
+                }
+                else if (_offlineFirstQuery.IsError)
+                {
+                    <span class="text-danger">@_offlineFirstQuery.Error?.Message</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<p class="text-muted">Toggle offline, then click refetch to see how each mode behaves.</p>
+<button class="btn btn-outline-primary" @onclick="RefetchAll">Refetch All</button>
+
+@code {
+    private UseQuery<string> _onlineQuery = null!;
+    private UseQuery<string> _alwaysQuery = null!;
+    private UseQuery<string> _offlineFirstQuery = null!;
+    private bool _isOnline = true;
+
+    protected override void OnParametersSet()
+    {
+        _onlineQuery = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("net-online"),
+            queryFn: async _ => { await Task.Delay(300); return $"Online: {DateTime.Now:T}"; },
+            networkMode: NetworkMode.Online,
+            staleTime: TimeSpan.FromSeconds(5)
+        ));
+
+        _alwaysQuery = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("net-always"),
+            queryFn: async _ => { await Task.Delay(300); return $"Always: {DateTime.Now:T}"; },
+            networkMode: NetworkMode.Always,
+            staleTime: TimeSpan.FromSeconds(5)
+        ));
+
+        _offlineFirstQuery = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("net-offline-first"),
+            queryFn: async _ => { await Task.Delay(300); return $"OfflineFirst: {DateTime.Now:T}"; },
+            networkMode: NetworkMode.OfflineFirst,
+            staleTime: TimeSpan.FromSeconds(5)
+        ));
+    }
+
+    private void ToggleNetwork()
+    {
+        _isOnline = !_isOnline;
+        QueryClient.OnlineManager.IsOnline = _isOnline;
+    }
+
+    private void RefetchAll()
+    {
+        QueryClient.InvalidateQueries();
+    }
+}

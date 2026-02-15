@@ -1,0 +1,83 @@
+@page "/samples/query-functions"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Query Functions</PageTitle>
+
+<h1>Query Functions</h1>
+<p>Demonstrates different query function patterns: async functions, context usage, and error handling.</p>
+
+<h4>Basic Async Function</h4>
+@if (_basic.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_basic.IsSuccess)
+{
+    <p class="alert alert-success">@_basic.Data</p>
+}
+
+<h4>Using QueryFunctionContext</h4>
+<p>The query function receives a context with <code>QueryKey</code>, <code>Signal</code> (CancellationToken), and <code>Meta</code>.</p>
+@if (_withContext.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_withContext.IsSuccess)
+{
+    <p class="alert alert-info">@_withContext.Data</p>
+}
+
+<h4>Error-Throwing Function</h4>
+@if (_failing.IsPending)
+{
+    <p><em>Loading (will fail)...</em></p>
+}
+else if (_failing.IsError)
+{
+    <div class="alert alert-danger">
+        Error: @_failing.Error?.Message
+        <br/><small>Failure count: @_failing.FailureCount</small>
+    </div>
+}
+
+@code {
+    private UseQuery<string> _basic = null!;
+    private UseQuery<string> _withContext = null!;
+    private UseQuery<string> _failing = null!;
+
+    protected override void OnParametersSet()
+    {
+        _basic = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("qf-basic"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300);
+                return $"Fetched at {DateTime.Now:T}";
+            },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        _withContext = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("qf-context", "demo"),
+            queryFn: async ctx =>
+            {
+                await Task.Delay(200);
+                var key = string.Join(", ", ctx.QueryKey.Parts);
+                return $"Key parts: [{key}], Has signal: {!ctx.Signal.IsCancellationRequested}";
+            },
+            meta: new Dictionary<string, object> { ["source"] = "sample" },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        _failing = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("qf-error"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(100);
+                throw new HttpRequestException("Simulated API error (404 Not Found)");
+            },
+            retry: 1,
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+    }
+}

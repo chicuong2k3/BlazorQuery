@@ -15,6 +15,7 @@ public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
     private readonly List<IDisposable> _disposables = new();
     private readonly Dictionary<string, object> _hooks = new();
     private readonly List<Func<Task>> _pendingExecutions = new();
+    private bool _disposed;
 
     /// <summary>
     /// Creates or retrieves a UseQuery hook. Call this in OnParametersSet.
@@ -73,7 +74,7 @@ public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _pendingExecutions.Count > 0)
+        if (firstRender && _pendingExecutions.Count > 0 && !_disposed)
         {
             var tasks = _pendingExecutions.Select(execute => execute()).ToArray();
             _pendingExecutions.Clear();
@@ -83,6 +84,9 @@ public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
 
     public virtual ValueTask DisposeAsync()
     {
+        if (_disposed) return ValueTask.CompletedTask;
+        _disposed = true;
+
         foreach (var d in _disposables)
             d.Dispose();
         _disposables.Clear();

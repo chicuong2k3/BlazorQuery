@@ -1,0 +1,74 @@
+@page "/samples/initial-data"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Initial Query Data</PageTitle>
+
+<h1>Initial Query Data</h1>
+<p><code>InitialData</code> is persisted to cache and avoids a loading state. The query still refetches in the background if stale.</p>
+
+<h4>With Initial Data</h4>
+@if (_withInitial.IsSuccess)
+{
+    <div class="alert @(_withInitial.IsFetchingBackground ? "alert-warning" : "alert-success")">
+        @_withInitial.Data
+        @if (_withInitial.IsFetchingBackground)
+        {
+            <span class="ms-2 badge bg-dark">Fetching fresh data...</span>
+        }
+    </div>
+}
+
+<h4>With InitialDataFunc (lazy)</h4>
+@if (_withFunc.IsSuccess)
+{
+    <div class="alert alert-info">@_withFunc.Data</div>
+}
+
+<h4>Without Initial Data (for comparison)</h4>
+@if (_withoutInitial.IsPending)
+{
+    <p><em>Loading... (no initial data)</em></p>
+}
+else if (_withoutInitial.IsSuccess)
+{
+    <div class="alert alert-secondary">@_withoutInitial.Data</div>
+}
+
+@code {
+    private UseQuery<string> _withInitial = null!;
+    private UseQuery<string> _withFunc = null!;
+    private UseQuery<string> _withoutInitial = null!;
+
+    protected override void OnParametersSet()
+    {
+        _withInitial = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("initial-data"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(1000);
+                return $"Fresh data from server at {DateTime.Now:T}";
+            },
+            initialData: "Instant initial data (from cache)"
+        ));
+
+        _withFunc = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("initial-func"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(800);
+                return $"Fresh: {DateTime.Now:T}";
+            },
+            initialDataFunc: () => $"Lazy initial data computed at {DateTime.Now:T}",
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        _withoutInitial = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("no-initial"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(1000);
+                return $"Loaded at {DateTime.Now:T}";
+            }
+        ));
+    }
+}

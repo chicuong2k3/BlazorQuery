@@ -1,0 +1,81 @@
+@page "/samples/invalidations-from-mutations"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Invalidations from Mutations</PageTitle>
+
+<h1>Invalidations from Mutations</h1>
+<p>When a mutation succeeds, invalidate related queries to keep the UI in sync.</p>
+
+<h4>Comments (@(_comments.Data?.Count ?? 0))</h4>
+@if (_comments.IsPending)
+{
+    <p><em>Loading comments...</em></p>
+}
+else if (_comments.IsSuccess)
+{
+    @if (_comments.IsFetchingBackground)
+    {
+        <p class="text-muted"><small>Refreshing...</small></p>
+    }
+    <ul class="list-group mb-3">
+        @foreach (var c in _comments.Data!)
+        {
+            <li class="list-group-item">@c</li>
+        }
+    </ul>
+}
+
+<div class="input-group mb-3">
+    <input class="form-control" @bind="_newComment" placeholder="Add comment..." />
+    <button class="btn btn-primary" @onclick="AddComment" disabled="@_addMutation.IsPending">
+        @(_addMutation.IsPending ? "Adding..." : "Add Comment")
+    </button>
+</div>
+
+@if (_addMutation.IsSuccess)
+{
+    <div class="alert alert-success">Comment added! Query automatically invalidated and refetched.</div>
+}
+
+@code {
+    private UseQuery<List<string>> _comments = null!;
+    private UseMutation<string, string> _addMutation = null!;
+    private string _newComment = "";
+
+    private static readonly List<string> _store = new() { "Great post!", "Thanks for sharing" };
+
+    protected override void OnParametersSet()
+    {
+        _comments = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("comments"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300);
+                return _store.ToList();
+            },
+            staleTime: TimeSpan.FromMinutes(5)
+        ));
+
+        _addMutation = UseMutation(new MutationOptions<string, string>
+        {
+            MutationFn = async comment =>
+            {
+                await Task.Delay(300);
+                _store.Add(comment);
+                return comment;
+            },
+            OnSuccess = (_, _, _, ctx) =>
+            {
+                ctx.Client.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("comments") });
+                return Task.CompletedTask;
+            }
+        });
+    }
+
+    private async Task AddComment()
+    {
+        if (string.IsNullOrWhiteSpace(_newComment)) return;
+        await _addMutation.MutateAsync(_newComment.Trim());
+        _newComment = "";
+    }
+}

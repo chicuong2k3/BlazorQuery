@@ -1,0 +1,65 @@
+@page "/samples/window-focus"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Window Focus Refetching</PageTitle>
+
+<h1>Window Focus Refetching</h1>
+<p>Switch to another tab and come back. Stale queries automatically refetch when the window regains focus.</p>
+
+<h4>Refetch on Focus (staleTime: 5s)</h4>
+<p>Switch tabs for 5+ seconds, then come back to see it refetch.</p>
+@if (_focusQuery.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_focusQuery.IsSuccess)
+{
+    <div class="alert alert-info">
+        @_focusQuery.Data
+        @if (_focusQuery.IsFetchingBackground)
+        {
+            <span class="ms-2 badge bg-warning">Refetching on focus...</span>
+        }
+    </div>
+}
+
+<h4>No Refetch on Focus</h4>
+<p>This query has <code>refetchOnWindowFocus: false</code>.</p>
+@if (_noFocusQuery.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_noFocusQuery.IsSuccess)
+{
+    <div class="alert alert-secondary">@_noFocusQuery.Data</div>
+}
+
+@code {
+    private UseQuery<string> _focusQuery = null!;
+    private UseQuery<string> _noFocusQuery = null!;
+
+    protected override void OnParametersSet()
+    {
+        _focusQuery = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("focus-refetch"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300);
+                return $"Last fetched: {DateTime.Now:T}";
+            },
+            staleTime: TimeSpan.FromSeconds(5),
+            refetchOnWindowFocus: true
+        ));
+
+        _noFocusQuery = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("no-focus-refetch"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300);
+                return $"Fetched once: {DateTime.Now:T} (won't refetch on focus)";
+            },
+            staleTime: TimeSpan.FromSeconds(5),
+            refetchOnWindowFocus: false
+        ));
+    }
+}

@@ -1,0 +1,62 @@
+@page "/samples/query-keys"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Query Keys</PageTitle>
+
+<h1>Query Keys</h1>
+<p>Demonstrates different query key patterns: simple strings, composite keys, and prefix matching.</p>
+
+<h4>Simple Key</h4>
+@if (_simple.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_simple.IsSuccess)
+{
+    <p class="alert alert-success">@_simple.Data</p>
+}
+
+<h4>Composite Key: <code>new QueryKey("user", @_userId)</code></h4>
+<div class="mb-2">
+    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => _userId = 1">User 1</button>
+    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => _userId = 2">User 2</button>
+    <button class="btn btn-sm btn-outline-primary" @onclick="() => _userId = 3">User 3</button>
+</div>
+@if (_user.IsPending)
+{
+    <p><em>Loading user @_userId...</em></p>
+}
+else if (_user.IsSuccess)
+{
+    <p class="alert alert-info">@_user.Data</p>
+}
+
+<h4>Prefix Invalidation</h4>
+<p>Invalidate all queries starting with <code>"user"</code>:</p>
+<button class="btn btn-outline-danger" @onclick="InvalidateAllUsers">Invalidate All Users</button>
+
+@code {
+    private UseQuery<string> _simple = null!;
+    private UseQuery<string> _user = null!;
+    private int _userId = 1;
+
+    protected override void OnParametersSet()
+    {
+        _simple = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("greeting"),
+            queryFn: async _ => { await Task.Delay(200); return "Hello from a simple key!"; },
+            staleTime: TimeSpan.FromMinutes(5)
+        ));
+
+        _user = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("user", _userId),
+            queryFn: async _ => { await Task.Delay(300); return $"User #{_userId} loaded at {DateTime.Now:T}"; },
+            staleTime: TimeSpan.FromSeconds(10)
+        ));
+    }
+
+    private void InvalidateAllUsers()
+    {
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("user") });
+    }
+}

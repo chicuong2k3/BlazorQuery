@@ -1,0 +1,84 @@
+@page "/samples/query-invalidation"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Query Invalidation</PageTitle>
+
+<h1>Query Invalidation</h1>
+<p>Invalidate queries to mark them as stale and trigger refetch for active ones.</p>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Users Query</div>
+            <div class="card-body">
+                @if (_users.IsPending)
+                {
+                    <p><em>Loading...</em></p>
+                }
+                else if (_users.IsSuccess)
+                {
+                    <p>@_users.Data @if (_users.IsFetchingBackground) { <span class="badge bg-warning">Refetching...</span> }</p>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Posts Query</div>
+            <div class="card-body">
+                @if (_posts.IsPending)
+                {
+                    <p><em>Loading...</em></p>
+                }
+                else if (_posts.IsSuccess)
+                {
+                    <p>@_posts.Data @if (_posts.IsFetchingBackground) { <span class="badge bg-warning">Refetching...</span> }</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4>Invalidation Controls</h4>
+<div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-outline-primary" @onclick="InvalidateUsers">Invalidate "users"</button>
+    <button class="btn btn-outline-primary" @onclick="InvalidatePosts">Invalidate "posts"</button>
+    <button class="btn btn-outline-danger" @onclick="InvalidateAll">Invalidate All</button>
+    <button class="btn btn-outline-warning" @onclick="RemoveUsers">Remove "users" from cache</button>
+    <button class="btn btn-outline-secondary" @onclick="ResetAll">Reset All</button>
+</div>
+
+@code {
+    private UseQuery<string> _users = null!;
+    private UseQuery<string> _posts = null!;
+
+    protected override void OnParametersSet()
+    {
+        _users = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("inv-users"),
+            queryFn: async _ => { await Task.Delay(400); return $"Users fetched at {DateTime.Now:T}"; },
+            staleTime: TimeSpan.FromMinutes(5)
+        ));
+
+        _posts = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("inv-posts"),
+            queryFn: async _ => { await Task.Delay(400); return $"Posts fetched at {DateTime.Now:T}"; },
+            staleTime: TimeSpan.FromMinutes(5)
+        ));
+    }
+
+    private void InvalidateUsers() =>
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("inv-users"), Exact = true });
+
+    private void InvalidatePosts() =>
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("inv-posts"), Exact = true });
+
+    private void InvalidateAll() =>
+        QueryClient.InvalidateQueries();
+
+    private void RemoveUsers() =>
+        QueryClient.RemoveQueries(new QueryFilters { QueryKey = new QueryKey("inv-users"), Exact = true });
+
+    private void ResetAll() =>
+        QueryClient.ResetQueries();
+}

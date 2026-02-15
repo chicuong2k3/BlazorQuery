@@ -1,0 +1,81 @@
+@page "/samples/disabling-queries"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Disabling/Pausing Queries</PageTitle>
+
+<h1>Disabling/Pausing Queries</h1>
+<p>Use the <code>Enabled</code> option to control when a query executes.</p>
+
+<h4>Toggle Query</h4>
+<div class="mb-3">
+    <button class="btn @(_enabled ? "btn-success" : "btn-secondary")" @onclick="ToggleEnabled">
+        Query is: @(_enabled ? "Enabled" : "Disabled")
+    </button>
+</div>
+
+@if (_query.IsPending)
+{
+    <p><em>@(_enabled ? "Loading..." : "Query is disabled — no data fetched")</em></p>
+}
+else if (_query.IsSuccess)
+{
+    <div class="alert alert-success">@_query.Data</div>
+}
+
+<h4>Search on Type (enabled when 3+ chars)</h4>
+<div class="mb-2">
+    <input class="form-control" placeholder="Type to search (3+ chars)..." @bind="_searchTerm" @bind:event="oninput"/>
+</div>
+@if (_searchTerm.Length < 3)
+{
+    <p class="text-muted">Type at least 3 characters to search</p>
+}
+else if (_search.IsPending)
+{
+    <p><em>Searching "@_searchTerm"...</em></p>
+}
+else if (_search.IsSuccess)
+{
+    <ul class="list-group">
+        @foreach (var r in _search.Data!)
+        {
+            <li class="list-group-item">@r</li>
+        }
+    </ul>
+}
+
+@code {
+    private UseQuery<string> _query = null!;
+    private UseQuery<List<string>> _search = null!;
+    private bool _enabled = true;
+    private string _searchTerm = "";
+
+    private static readonly string[] Items = ["Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew"];
+
+    protected override void OnParametersSet()
+    {
+        _query = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("disable-demo"),
+            queryFn: async _ => { await Task.Delay(400); return $"Data loaded at {DateTime.Now:T}"; },
+            enabled: _enabled,
+            staleTime: TimeSpan.FromSeconds(10)
+        ));
+
+        _search = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("search", _searchTerm),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300);
+                return Items.Where(i => i.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+            },
+            enabled: _searchTerm.Length >= 3,
+            staleTime: TimeSpan.FromSeconds(30)
+        ));
+    }
+
+    private void ToggleEnabled()
+    {
+        _enabled = !_enabled;
+        _query.Options.Enabled = _enabled;
+    }
+}

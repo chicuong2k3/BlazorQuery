@@ -1,0 +1,77 @@
+@page "/samples/dependent-queries"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Dependent Queries</PageTitle>
+
+<h1>Dependent Queries</h1>
+<p>The second query depends on the first query's result. It stays disabled until the user is loaded.</p>
+
+<h4>Step 1: Load User</h4>
+@if (_user.IsPending)
+{
+    <p><em>Loading user...</em></p>
+}
+else if (_user.IsSuccess)
+{
+    <div class="alert alert-info">Loaded: @_user.Data!.Name (ID: @_user.Data!.Id)</div>
+}
+
+<h4>Step 2: Load User's Posts (depends on user ID)</h4>
+@if (!_user.IsSuccess)
+{
+    <p class="text-muted">Waiting for user to load...</p>
+}
+else if (_posts.IsPending)
+{
+    <p><em>Loading posts for @_user.Data!.Name...</em></p>
+}
+else if (_posts.IsSuccess)
+{
+    <ul class="list-group">
+        @foreach (var post in _posts.Data!)
+        {
+            <li class="list-group-item">@post</li>
+        }
+    </ul>
+}
+
+@code {
+    private UseQuery<UserInfo> _user = null!;
+    private UseQuery<List<string>> _posts = null!;
+
+    protected override void OnParametersSet()
+    {
+        _user = UseQuery(new QueryOptions<UserInfo>(
+            queryKey: new QueryKey("dep-user"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(500);
+                return new UserInfo { Id = 42, Name = "Alice" };
+            },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        var userId = _user.Data?.Id;
+        _posts = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("dep-posts", userId ?? 0),
+            queryFn: async _ =>
+            {
+                await Task.Delay(400);
+                return new List<string>
+                {
+                    $"Post by user {userId}: Getting started with SwrSharp",
+                    $"Post by user {userId}: Blazor integration tips",
+                    $"Post by user {userId}: Advanced caching patterns"
+                };
+            },
+            enabled: userId != null,
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+    }
+
+    public class UserInfo
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = "";
+    }
+}

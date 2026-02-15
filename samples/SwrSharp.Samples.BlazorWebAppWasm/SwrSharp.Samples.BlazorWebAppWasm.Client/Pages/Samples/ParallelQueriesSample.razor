@@ -1,0 +1,92 @@
+@page "/samples/parallel-queries"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Parallel Queries</PageTitle>
+
+<h1>Parallel Queries</h1>
+<p>Multiple independent queries run in parallel. Each has its own loading/error state.</p>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Users</div>
+            <div class="card-body">
+                @if (_users.IsPending)
+                {
+                    <p><em>Loading users...</em></p>
+                }
+                else if (_users.IsSuccess)
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var u in _users.Data!)
+                        {
+                            <li>@u</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Products</div>
+            <div class="card-body">
+                @if (_products.IsPending)
+                {
+                    <p><em>Loading products...</em></p>
+                }
+                else if (_products.IsSuccess)
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var p in _products.Data!)
+                        {
+                            <li>@p</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Settings</div>
+            <div class="card-body">
+                @if (_settings.IsPending)
+                {
+                    <p><em>Loading settings...</em></p>
+                }
+                else if (_settings.IsSuccess)
+                {
+                    <p class="mb-0">Theme: @_settings.Data</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UseQuery<List<string>> _users = null!;
+    private UseQuery<List<string>> _products = null!;
+    private UseQuery<string> _settings = null!;
+
+    protected override void OnParametersSet()
+    {
+        _users = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("parallel-users"),
+            queryFn: async _ => { await Task.Delay(500); return new List<string> { "Alice", "Bob", "Charlie" }; },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        _products = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("parallel-products"),
+            queryFn: async _ => { await Task.Delay(800); return new List<string> { "Widget", "Gadget", "Doohickey" }; },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        _settings = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("parallel-settings"),
+            queryFn: async _ => { await Task.Delay(200); return "Dark Mode"; },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+    }
+}

@@ -1,0 +1,74 @@
+@page "/samples/filters"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Filters</PageTitle>
+
+<h1>Query Filters</h1>
+<p>Use <code>QueryFilters</code> to target specific queries for invalidation, refetching, or removal.</p>
+
+<div class="row mb-3">
+    @foreach (var key in new[] { "alpha", "beta", "gamma" })
+    {
+        var q = _queries[key];
+        <div class="col-md-4">
+            <div class="card mb-2">
+                <div class="card-header d-flex justify-content-between">
+                    <span>@key</span>
+                    <span class="badge @(q.IsFetching ? "bg-warning" : q.IsSuccess ? "bg-success" : "bg-secondary")">
+                        @(q.IsFetching ? "Fetching" : q.IsSuccess ? "Fresh" : "Pending")
+                    </span>
+                </div>
+                <div class="card-body">
+                    @if (q.IsPending) { <em>Loading...</em> }
+                    else if (q.IsSuccess) { <span>@q.Data</span> }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<h4>Filter Operations</h4>
+<div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-outline-primary" @onclick="InvalidatePrefix">Invalidate prefix "filter-"</button>
+    <button class="btn btn-outline-primary" @onclick="InvalidateExact">Invalidate exact "filter-alpha"</button>
+    <button class="btn btn-outline-warning" @onclick="RefetchAll">Refetch all "filter-" queries</button>
+    <button class="btn btn-outline-info" @onclick="ShowFetchingCount">Fetching count</button>
+</div>
+
+@if (_message != null)
+{
+    <div class="alert alert-info mt-2">@_message</div>
+}
+
+@code {
+    private readonly Dictionary<string, UseQuery<string>> _queries = new();
+    private string? _message;
+
+    protected override void OnParametersSet()
+    {
+        foreach (var key in new[] { "alpha", "beta", "gamma" })
+        {
+            var delay = key == "alpha" ? 300 : key == "beta" ? 500 : 700;
+            _queries[key] = UseQuery(new QueryOptions<string>(
+                queryKey: new QueryKey("filter-" + key),
+                queryFn: async _ => { await Task.Delay(delay); return $"{key}: {DateTime.Now:T}"; },
+                staleTime: TimeSpan.FromMinutes(5)
+            ));
+        }
+    }
+
+    private void InvalidatePrefix() =>
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("filter-") });
+
+    private void InvalidateExact() =>
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("filter-alpha"), Exact = true });
+
+    private void RefetchAll() =>
+        QueryClient.RefetchQueries(new QueryFilters { QueryKey = new QueryKey("filter-") });
+
+    private void ShowFetchingCount()
+    {
+        var count = QueryClient.GetFetchingCount();
+        _message = $"Currently fetching: {count} queries";
+    }
+}

@@ -1,0 +1,69 @@
+@page "/samples/query-options"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Query Options</PageTitle>
+
+<h1>Query Options</h1>
+<p>Demonstrates key options: <code>staleTime</code> and <code>refetchInterval</code>.</p>
+
+<h4>Stale Time (30s)</h4>
+<p>Data stays fresh for 30 seconds. Navigate away and back — no refetch if still fresh.</p>
+@if (_staleDemo.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_staleDemo.IsSuccess)
+{
+    <div class="alert alert-info">
+        @_staleDemo.Data
+        @if (_staleDemo.IsFetchingBackground)
+        {
+            <span class="ms-2 badge bg-warning">Refetching...</span>
+        }
+    </div>
+}
+
+<h4>Refetch Interval (3s)</h4>
+<p>Auto-polls every 3 seconds:</p>
+@if (_pollingDemo.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_pollingDemo.IsSuccess)
+{
+    <div class="alert alert-success">
+        @_pollingDemo.Data
+        @if (_pollingDemo.IsFetching)
+        {
+            <span class="ms-2 badge bg-warning">Polling...</span>
+        }
+    </div>
+}
+
+@code {
+    private UseQuery<string> _staleDemo = null!;
+    private UseQuery<string> _pollingDemo = null!;
+
+    protected override void OnParametersSet()
+    {
+        _staleDemo = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("stale-demo"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(300);
+                return $"Fetched at {DateTime.Now:T} — fresh for 30s";
+            },
+            staleTime: TimeSpan.FromSeconds(30)
+        ));
+
+        _pollingDemo = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("polling-demo"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(200);
+                return $"Poll result: {DateTime.Now:T}";
+            },
+            refetchInterval: TimeSpan.FromSeconds(3)
+        ));
+    }
+}

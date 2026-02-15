@@ -1,0 +1,70 @@
+@page "/samples/infinite-queries"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Infinite Queries</PageTitle>
+
+<h1>Infinite Queries</h1>
+<p>Load more items incrementally using <code>UseInfiniteQuery</code>.</p>
+
+@if (_posts.IsPending)
+{
+    <p><em>Loading first page...</em></p>
+}
+else if (_posts.IsError)
+{
+    <div class="alert alert-danger">Error: @_posts.Error?.Message</div>
+}
+else if (_posts.IsSuccess)
+{
+    <p class="text-muted">Loaded @_posts.Data.Pages.Count page(s), @_posts.Data.Pages.Sum(p => p.Count) total items</p>
+
+    <ul class="list-group mb-3">
+        @foreach (var page in _posts.Data.Pages)
+        {
+            @foreach (var post in page)
+            {
+                <li class="list-group-item">@post</li>
+            }
+        }
+    </ul>
+
+    @if (_posts.HasNextPage)
+    {
+        <button class="btn btn-primary" @onclick="LoadMore" disabled="@_posts.IsFetchingNextPage">
+            @(_posts.IsFetchingNextPage ? "Loading more..." : "Load More")
+        </button>
+    }
+    else
+    {
+        <p class="text-muted">No more items to load.</p>
+    }
+}
+
+@code {
+    private UseInfiniteQuery<List<string>, int?> _posts = null!;
+    private const int PageSize = 5;
+    private const int TotalItems = 23;
+
+    protected override void OnParametersSet()
+    {
+        _posts = UseInfiniteQuery(new InfiniteQueryOptions<List<string>, int?>(
+            queryKey: new QueryKey("infinite-posts"),
+            queryFn: async ctx =>
+            {
+                var page = (int)ctx.PageParam!;
+                await Task.Delay(500);
+                var start = (page - 1) * PageSize;
+                var count = Math.Min(PageSize, TotalItems - start);
+                return Enumerable.Range(start + 1, Math.Max(0, count))
+                    .Select(i => $"Post #{i}: Lorem ipsum dolor sit amet")
+                    .ToList();
+            },
+            initialPageParam: 1,
+            getNextPageParam: (lastPage, allPages, lastParam) =>
+                lastPage.Count == PageSize ? lastParam + 1 : null,
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+    }
+
+    private async Task LoadMore() => await _posts.FetchNextPageAsync();
+}

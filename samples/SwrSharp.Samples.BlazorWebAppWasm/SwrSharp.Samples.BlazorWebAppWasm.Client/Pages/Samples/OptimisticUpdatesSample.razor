@@ -1,0 +1,89 @@
+@page "/samples/optimistic-updates"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Updates from Mutation Responses</PageTitle>
+
+<h1>Updates from Mutation Responses</h1>
+<p>Use <code>OnMutate</code> to optimistically update the cache before the mutation completes, and roll back on error.</p>
+
+<h4>Likes: @(_likes.Data)</h4>
+@if (_likes.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="d-flex gap-2 align-items-center mb-3">
+        <button class="btn btn-primary" @onclick="HandleLike" disabled="@_likeMutation.IsPending">
+            @(_likeMutation.IsPending ? "Liking..." : "Like")
+        </button>
+        <button class="btn btn-outline-danger" @onclick="HandleLikeFail">
+            Like (will fail — watch rollback)
+        </button>
+    </div>
+}
+
+@if (_likeMutation.IsError)
+{
+    <div class="alert alert-danger">Error: @_likeMutation.Error?.Message — cache rolled back!</div>
+}
+
+<h4>Log</h4>
+<ul class="list-group">
+    @foreach (var log in _logs)
+    {
+        <li class="list-group-item py-1 small">@log</li>
+    }
+</ul>
+
+@code {
+    private UseQuery<int> _likes = null!;
+    private UseMutation<int, bool> _likeMutation = null!;
+    private readonly List<string> _logs = new();
+    private static int _serverLikes = 10;
+
+    protected override void OnParametersSet()
+    {
+        _likes = UseQuery(new QueryOptions<int>(
+            queryKey: new QueryKey("likes"),
+            queryFn: async _ => { await Task.Delay(200); return _serverLikes; },
+            staleTime: TimeSpan.FromMinutes(5)
+        ));
+
+        _likeMutation = UseMutation(new MutationOptions<int, bool>
+        {
+            MutationFn = async shouldFail =>
+            {
+                await Task.Delay(500);
+                if (shouldFail) throw new Exception("Server error!");
+                _serverLikes++;
+                return _serverLikes;
+            },
+            OnMutate = (_, ctx) =>
+            {
+                var previous = ctx.Client.Get<int>(new QueryKey("likes"));
+                ctx.Client.Set(new QueryKey("likes"), previous + 1);
+                _logs.Add($"OnMutate: optimistically set likes to {previous + 1}");
+                return Task.FromResult<object?>(previous);
+            },
+            OnError = (ex, _, onMutateResult, ctx) =>
+            {
+                if (onMutateResult is int prev)
+                {
+                    ctx.Client.Set(new QueryKey("likes"), prev);
+                    _logs.Add($"OnError: rolled back to {prev}");
+                }
+                return Task.CompletedTask;
+            },
+            OnSettled = (_, _, _, _, ctx) =>
+            {
+                ctx.Client.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("likes") });
+                _logs.Add("OnSettled: invalidated likes query");
+                return Task.CompletedTask;
+            }
+        });
+    }
+
+    private void HandleLike() => _likeMutation.Mutate(false);
+    private void HandleLikeFail() => _likeMutation.Mutate(true);
+}

@@ -1,0 +1,86 @@
+@page "/samples/query-cancellation"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Query Cancellation</PageTitle>
+
+<h1>Query Cancellation</h1>
+<p>Cancel in-flight queries using <code>CancelQueries</code> or the <code>Signal</code> CancellationToken in the query function.</p>
+
+<h4>Slow Query (3 second delay)</h4>
+@if (_slow.IsPending)
+{
+    <p>
+        <em>Loading (takes 3 seconds)...</em>
+        <button class="btn btn-sm btn-outline-danger ms-2" @onclick="CancelSlow">Cancel</button>
+    </p>
+}
+else if (_slow.IsError)
+{
+    <div class="alert alert-warning">
+        Cancelled or errored: @_slow.Error?.Message
+        <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => _slow.RefetchAsync()">Retry</button>
+    </div>
+}
+else if (_slow.IsSuccess)
+{
+    <div class="alert alert-success">@_slow.Data</div>
+}
+
+<h4>Token-Aware Query</h4>
+<p>The query function checks <code>ctx.Signal</code> for cooperative cancellation:</p>
+@if (_tokenAware.IsPending)
+{
+    <p>
+        <em>Processing steps...</em>
+        <button class="btn btn-sm btn-outline-danger ms-2" @onclick="CancelToken">Cancel</button>
+    </p>
+}
+else if (_tokenAware.IsError)
+{
+    <div class="alert alert-warning">
+        @_tokenAware.Error?.Message
+        <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => _tokenAware.RefetchAsync()">Retry</button>
+    </div>
+}
+else if (_tokenAware.IsSuccess)
+{
+    <div class="alert alert-success">@_tokenAware.Data</div>
+}
+
+@code {
+    private UseQuery<string> _slow = null!;
+    private UseQuery<string> _tokenAware = null!;
+
+    protected override void OnParametersSet()
+    {
+        _slow = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("cancel-slow"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(3000);
+                return $"Slow query done at {DateTime.Now:T}";
+            },
+            retry: 0
+        ));
+
+        _tokenAware = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("cancel-token"),
+            queryFn: async ctx =>
+            {
+                for (var i = 1; i <= 5; i++)
+                {
+                    ctx.Signal.ThrowIfCancellationRequested();
+                    await Task.Delay(600, ctx.Signal);
+                }
+                return $"All 5 steps completed at {DateTime.Now:T}";
+            },
+            retry: 0
+        ));
+    }
+
+    private void CancelSlow() =>
+        QueryClient.CancelQueries(new QueryFilters { QueryKey = new QueryKey("cancel-slow"), Exact = true });
+
+    private void CancelToken() =>
+        QueryClient.CancelQueries(new QueryFilters { QueryKey = new QueryKey("cancel-token"), Exact = true });
+}

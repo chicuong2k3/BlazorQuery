@@ -1,0 +1,80 @@
+@page "/samples/default-query-function"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Default Query Function</PageTitle>
+
+<h1>Default Query Function</h1>
+<p>Register a default query function for a type so you don't need to specify <code>queryFn</code> every time.</p>
+
+<h4>Setup</h4>
+<button class="btn btn-outline-primary mb-3" @onclick="RegisterDefault">Register default QueryFn for string</button>
+
+@if (!_registered)
+{
+    <p class="text-muted">Click above to register a default query function for <code>string</code> type.</p>
+}
+else
+{
+    <div class="alert alert-success mb-3">Default QueryFn registered! Queries below use it automatically.</div>
+
+    <h4>Query A (no explicit queryFn)</h4>
+    @if (_queryA.IsPending)
+    {
+        <p><em>Loading A...</em></p>
+    }
+    else if (_queryA.IsSuccess)
+    {
+        <div class="alert alert-info">@_queryA.Data</div>
+    }
+    else if (_queryA.IsError)
+    {
+        <div class="alert alert-danger">@_queryA.Error?.Message</div>
+    }
+
+    <h4>Query B (no explicit queryFn)</h4>
+    @if (_queryB.IsPending)
+    {
+        <p><em>Loading B...</em></p>
+    }
+    else if (_queryB.IsSuccess)
+    {
+        <div class="alert alert-info">@_queryB.Data</div>
+    }
+    else if (_queryB.IsError)
+    {
+        <div class="alert alert-danger">@_queryB.Error?.Message</div>
+    }
+}
+
+@code {
+    private UseQuery<string> _queryA = null!;
+    private UseQuery<string> _queryB = null!;
+    private bool _registered;
+
+    private void RegisterDefault()
+    {
+        QueryClient.SetDefaultQueryFn<string>(async ctx =>
+        {
+            await Task.Delay(400);
+            var key = string.Join("/", ctx.QueryKey.Parts);
+            return $"Default fetcher resolved: [{key}] at {DateTime.Now:T}";
+        });
+        _registered = true;
+        StateHasChanged();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!_registered) return;
+
+        _queryA = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("default-fn", "A"),
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        _queryB = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("default-fn", "B"),
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+    }
+}

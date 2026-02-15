@@ -1,0 +1,87 @@
+@page "/samples/caching-examples"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Caching Examples</PageTitle>
+
+<h1>Caching Examples</h1>
+<p>Demonstrates cache read/write, prefetching, and cache inspection.</p>
+
+<h4>Manual Cache Operations</h4>
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-outline-primary" @onclick="SetCache">Set cache manually</button>
+    <button class="btn btn-outline-info" @onclick="ReadCache">Read cache</button>
+    <button class="btn btn-outline-warning" @onclick="PrefetchNext">Prefetch "next-page"</button>
+</div>
+
+@if (_cacheMessage != null)
+{
+    <div class="alert alert-info">@_cacheMessage</div>
+}
+
+<h4>Query using cached data</h4>
+@if (_query.IsPending)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_query.IsSuccess)
+{
+    <div class="alert alert-success">
+        @_query.Data
+        @if (_query.IsFetchingBackground)
+        {
+            <span class="badge bg-warning ms-2">Background refetch</span>
+        }
+    </div>
+}
+
+<h4>Cache Entry Inspector</h4>
+<button class="btn btn-sm btn-outline-secondary mb-2" @onclick="InspectCache">Inspect cache entry</button>
+@if (_cacheEntry != null)
+{
+    <pre class="bg-light p-2 rounded">Data: @_cacheEntry.Data
+FetchTime: @_cacheEntry.FetchTime
+DataUpdatedAt: @_cacheEntry.DataUpdatedAt
+Error: @(_cacheEntry.Error?.Message ?? "null")</pre>
+}
+
+@code {
+    private UseQuery<string> _query = null!;
+    private string? _cacheMessage;
+    private QueryClient.CacheEntry? _cacheEntry;
+
+    protected override void OnParametersSet()
+    {
+        _query = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("cache-demo"),
+            queryFn: async _ => { await Task.Delay(500); return $"Server data at {DateTime.Now:T}"; },
+            staleTime: TimeSpan.FromSeconds(15)
+        ));
+    }
+
+    private void SetCache()
+    {
+        QueryClient.Set(new QueryKey("cache-demo"), $"Manually set at {DateTime.Now:T}");
+        _cacheMessage = "Cache updated! The query will show the new value.";
+    }
+
+    private void ReadCache()
+    {
+        var data = QueryClient.Get<string>(new QueryKey("cache-demo"));
+        _cacheMessage = data != null ? $"Cache hit: {data}" : "Cache miss: no data";
+    }
+
+    private async Task PrefetchNext()
+    {
+        await QueryClient.PrefetchQueryAsync(new QueryOptions<string>(
+            queryKey: new QueryKey("next-page"),
+            queryFn: async _ => { await Task.Delay(300); return "Prefetched data!"; },
+            staleTime: TimeSpan.FromMinutes(5)
+        ));
+        _cacheMessage = "Prefetched 'next-page'. Check cache with ReadCache for key 'next-page'.";
+    }
+
+    private void InspectCache()
+    {
+        _cacheEntry = QueryClient.GetCacheEntry(new QueryKey("cache-demo"));
+    }
+}

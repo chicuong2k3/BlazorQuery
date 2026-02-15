@@ -1,0 +1,86 @@
+@page "/samples/query-retries"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Query Retries</PageTitle>
+
+<h1>Query Retries</h1>
+<p>Demonstrates retry behavior with exponential backoff. The query fails 3 times then succeeds.</p>
+
+<h4>Auto Retry (max 3 retries, exponential backoff)</h4>
+@if (_retryQuery.IsPending)
+{
+    <p>
+        <em>Loading... (attempt @(_retryQuery.FailureCount + 1))</em>
+        @if (_retryQuery.FailureReason != null)
+        {
+            <br/><small class="text-danger">Last error: @_retryQuery.FailureReason.Message</small>
+        }
+    </p>
+}
+else if (_retryQuery.IsError)
+{
+    <div class="alert alert-danger">
+        Failed after @_retryQuery.FailureCount retries: @_retryQuery.Error?.Message
+    </div>
+}
+else if (_retryQuery.IsSuccess)
+{
+    <div class="alert alert-success">@_retryQuery.Data</div>
+}
+
+<h4>Custom Retry (only retry on specific errors)</h4>
+@if (_customRetry.IsPending)
+{
+    <p><em>Loading with custom retry logic...</em></p>
+}
+else if (_customRetry.IsError)
+{
+    <div class="alert alert-danger">@_customRetry.Error?.Message (FailureCount: @_customRetry.FailureCount)</div>
+}
+else if (_customRetry.IsSuccess)
+{
+    <div class="alert alert-success">@_customRetry.Data</div>
+}
+
+@code {
+    private UseQuery<string> _retryQuery = null!;
+    private UseQuery<string> _customRetry = null!;
+    private static int _attemptCount;
+    private static int _customAttemptCount;
+
+    protected override void OnParametersSet()
+    {
+        _attemptCount = 0;
+
+        _retryQuery = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("retry-demo", Random.Shared.Next()),
+            queryFn: async _ =>
+            {
+                await Task.Delay(200);
+                _attemptCount++;
+                if (_attemptCount <= 3)
+                    throw new Exception($"Attempt {_attemptCount} failed");
+                return $"Success on attempt {_attemptCount}!";
+            },
+            retry: 3,
+            retryDelay: TimeSpan.FromMilliseconds(500)
+        ));
+
+        _customAttemptCount = 0;
+
+        _customRetry = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("custom-retry", Random.Shared.Next()),
+            queryFn: async _ =>
+            {
+                await Task.Delay(200);
+                _customAttemptCount++;
+                if (_customAttemptCount == 1)
+                    throw new InvalidOperationException("Retryable error");
+                if (_customAttemptCount == 2)
+                    throw new UnauthorizedAccessException("Non-retryable error");
+                return "Should not reach here";
+            },
+            retryFunc: (_, ex) => ex is not UnauthorizedAccessException
+        ));
+    }
+}

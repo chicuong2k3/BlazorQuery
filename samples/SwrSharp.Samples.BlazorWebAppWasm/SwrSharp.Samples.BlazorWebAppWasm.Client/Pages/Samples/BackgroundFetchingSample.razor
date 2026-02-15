@@ -1,0 +1,80 @@
+@page "/samples/background-fetching"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Background Fetching Indicators</PageTitle>
+
+<h1>Background Fetching Indicators</h1>
+<p>Shows how to display global and per-query background fetching indicators.</p>
+
+<h4>Global Fetching Indicator</h4>
+<div class="alert @(QueryClient.IsFetching ? "alert-warning" : "alert-secondary")">
+    @(QueryClient.IsFetching ? "Fetching somewhere..." : "All queries idle")
+</div>
+
+<h4>Per-Query Indicators</h4>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between">
+                <span>Users</span>
+                @if (_users.IsFetchingBackground)
+                {
+                    <span class="badge bg-warning">Background refresh</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (_users.IsPending)
+                {
+                    <p><em>Loading...</em></p>
+                }
+                else if (_users.IsSuccess)
+                {
+                    <p>@string.Join(", ", _users.Data!)</p>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => _users.RefetchAsync()">Refetch</button>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between">
+                <span>Stats</span>
+                @if (_stats.IsFetchingBackground)
+                {
+                    <span class="badge bg-warning">Background refresh</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (_stats.IsPending)
+                {
+                    <p><em>Loading...</em></p>
+                }
+                else if (_stats.IsSuccess)
+                {
+                    <p>@_stats.Data</p>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => _stats.RefetchAsync()">Refetch</button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UseQuery<List<string>> _users = null!;
+    private UseQuery<string> _stats = null!;
+
+    protected override void OnParametersSet()
+    {
+        _users = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("bg-users"),
+            queryFn: async _ => { await Task.Delay(800); return new List<string> { "Alice", "Bob", "Charlie" }; },
+            staleTime: TimeSpan.FromSeconds(5)
+        ));
+
+        _stats = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("bg-stats"),
+            queryFn: async _ => { await Task.Delay(600); return $"Total users: {Random.Shared.Next(100, 999)} (at {DateTime.Now:T})"; },
+            staleTime: TimeSpan.FromSeconds(5)
+        ));
+    }
+}

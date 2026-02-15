@@ -1,0 +1,59 @@
+@page "/samples/paginated-queries"
+@inherits SwrSharpComponentBase
+
+<PageTitle>Paginated Queries</PageTitle>
+
+<h1>Paginated Queries</h1>
+<p>Page-by-page navigation using a different <code>QueryKey</code> per page.</p>
+
+<h4>Page @_page</h4>
+@if (_items.IsPending)
+{
+    <p><em>Loading page @_page...</em></p>
+}
+else if (_items.IsSuccess)
+{
+    <ul class="list-group mb-3">
+        @foreach (var item in _items.Data!)
+        {
+            <li class="list-group-item">@item</li>
+        }
+    </ul>
+
+    @if (_items.IsFetchingBackground)
+    {
+        <p class="text-muted"><small>Refreshing...</small></p>
+    }
+}
+
+<div>
+    <button class="btn btn-outline-primary me-2" disabled="@(_page <= 1)" @onclick="PrevPage">Previous</button>
+    <span class="align-middle">Page @_page of @TotalPages</span>
+    <button class="btn btn-outline-primary ms-2" disabled="@(_page >= TotalPages)" @onclick="NextPage">Next</button>
+</div>
+
+@code {
+    private UseQuery<List<string>> _items = null!;
+    private int _page = 1;
+    private const int TotalPages = 5;
+    private const int PageSize = 5;
+
+    protected override void OnParametersSet()
+    {
+        _items = UseQuery(new QueryOptions<List<string>>(
+            queryKey: new QueryKey("paginated", _page),
+            queryFn: async _ =>
+            {
+                await Task.Delay(400);
+                var start = (_page - 1) * PageSize + 1;
+                return Enumerable.Range(start, PageSize)
+                    .Select(i => $"Item #{i}")
+                    .ToList();
+            },
+            staleTime: TimeSpan.FromSeconds(30)
+        ));
+    }
+
+    private void PrevPage() { if (_page > 1) _page--; }
+    private void NextPage() { if (_page < TotalPages) _page++; }
+}
