@@ -6,7 +6,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
-
     <ItemGroup>
         <SupportedPlatform Include="browser"/>
     </ItemGroup>
@@ -16,7 +15,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="wwwroot\" />
+        <ProjectReference Include="..\SwrSharp.Core\SwrSharp.Core.csproj"/>
     </ItemGroup>
 
 </Project>

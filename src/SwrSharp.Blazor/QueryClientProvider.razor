@@ -1,0 +1,28 @@
+@implements IDisposable
+
+<CascadingValue Value="@_resolvedClient">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Optional explicit QueryClient. If not provided, uses the DI-registered client.
+    /// </summary>
+    [Parameter] public QueryClient? Client { get; set; }
+
+    [Inject] private QueryClient InjectedClient { get; set; } = null!;
+
+    private QueryClient _resolvedClient = null!;
+
+    protected override void OnInitialized()
+    {
+        _resolvedClient = Client ?? InjectedClient;
+    }
+
+    public void Dispose()
+    {
+        // Only dispose if we own the client (not injected from DI)
+    }
+}

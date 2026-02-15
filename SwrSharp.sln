@@ -19,6 +19,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Doc", "docs\SwrSha
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Blazor", "src\SwrSharp.Blazor\SwrSharp.Blazor.csproj", "{8663375C-D500-48EF-AA6B-4BBE471B6434}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Samples.BlazorWebAppWasm", "samples\SwrSharp.Samples.BlazorWebAppWasm\SwrSharp.Samples.BlazorWebAppWasm\SwrSharp.Samples.BlazorWebAppWasm.csproj", "{8E7F7485-FC8A-421C-834F-26C1B9EE196B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwrSharp.Samples.BlazorWebAppWasm.Client", "samples\SwrSharp.Samples.BlazorWebAppWasm\SwrSharp.Samples.BlazorWebAppWasm.Client\SwrSharp.Samples.BlazorWebAppWasm.Client.csproj", "{8479B38B-7581-4663-BEC9-745329A6CBB1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +45,14 @@ Global
 		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8663375C-D500-48EF-AA6B-4BBE471B6434}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8E7F7485-FC8A-421C-834F-26C1B9EE196B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E7F7485-FC8A-421C-834F-26C1B9EE196B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E7F7485-FC8A-421C-834F-26C1B9EE196B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E7F7485-FC8A-421C-834F-26C1B9EE196B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8479B38B-7581-4663-BEC9-745329A6CBB1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8479B38B-7581-4663-BEC9-745329A6CBB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8479B38B-7581-4663-BEC9-745329A6CBB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8479B38B-7581-4663-BEC9-745329A6CBB1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
