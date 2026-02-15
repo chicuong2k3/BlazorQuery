@@ -35,18 +35,22 @@ var query = new UseQuery<List<Todo>>(
     queryClient
 );
 
-// Immediate state:
+// Immediate state (before ExecuteAsync):
 // - Data = placeholderTodos
 // - Status = Success (has data to display)
 // - IsPlaceholderData = true
 // - Cache is EMPTY (not persisted)
 
-await query.ExecuteAsync();
+query.OnChange += () =>
+{
+    if (!query.IsPlaceholderData && query.IsSuccess)
+    {
+        // Real data fetched — Data = real todos, IsPlaceholderData = false
+        // Notify your UI framework to re-render
+    }
+};
 
-// After fetch:
-// - Data = real todos
-// - IsPlaceholderData = false
-// - Cache has real data
+_ = query.ExecuteAsync();
 ```
 
 ## `IsPlaceholderData` Flag
@@ -63,14 +67,24 @@ var query = new UseQuery<Data>(
     queryClient
 );
 
-if (query.IsPlaceholderData)
+// Immediately after construction: IsPlaceholderData = true
+// Can render placeholder UI right away
+
+query.OnChange += () =>
 {
-    Console.WriteLine("Showing preview data (fetching full data...)");
-}
-else if (query.IsSuccess)
-{
-    Console.WriteLine("Showing real data");
-}
+    if (query.IsPlaceholderData)
+    {
+        // Still showing placeholder (fetching in progress)
+    }
+    else if (query.IsSuccess)
+    {
+        // Real data available
+    }
+
+    // Notify your UI framework to re-render
+};
+
+_ = query.ExecuteAsync();
 ```
 
 ## Placeholder Data as a Function
@@ -99,19 +113,9 @@ var query = new UseQuery<Data>(
 Get placeholder data from another query's cache (e.g., list → detail):
 
 ```csharp
-// First, we have a blog posts list query with previews
-var postsListQuery = new UseQuery<List<BlogPost>>(
-    new QueryOptions<List<BlogPost>>(
-        queryKey: new("blogPosts"),
-        queryFn: async ctx => await FetchBlogPostsListAsync()
-        // Returns: { Id, Title, Snippet } - preview data
-    ),
-    queryClient
-);
+// Assume a blog posts list query has already been executed and cached.
+// When navigating to a post detail, use preview from list cache as placeholder:
 
-await postsListQuery.ExecuteAsync();
-
-// Now create individual post query using preview as placeholder
 var postId = 123;
 var postQuery = new UseQuery<BlogPost>(
     new QueryOptions<BlogPost>(
@@ -127,88 +131,26 @@ var postQuery = new UseQuery<BlogPost>(
     queryClient
 );
 
-// Immediate:
-// - Shows preview (title + snippet) from cache
+// Immediate (if preview found in cache):
+// - Shows preview (title + snippet)
 // - IsPlaceholderData = true
 // - Status = Success (can render UI)
 
-await postQuery.ExecuteAsync();
+postQuery.OnChange += () =>
+{
+    if (!postQuery.IsPlaceholderData && postQuery.IsSuccess)
+    {
+        // Full content loaded from server
+    }
 
-// After fetch:
+    // Notify your UI framework to re-render
+};
+
+_ = postQuery.ExecuteAsync();
+
+// After fetch completes (via OnChange):
 // - Shows full content
 // - IsPlaceholderData = false
-```
-
-## Complete Example: Blog Post Detail
-
-```csharp
-public class BlogPostDetail : IDisposable
-{
-    private readonly QueryClient _queryClient;
-    
-    public async Task LoadPostAsync(int postId)
-    {
-        var postQuery = new UseQuery<BlogPost>(
-            new QueryOptions<BlogPost>(
-                queryKey: new("blogPost", postId),
-                queryFn: async ctx => {
-                    // Fetch full blog post from server
-                    Console.WriteLine($"Fetching full post {postId}...");
-                    return await FetchFullBlogPostAsync(postId);
-                },
-                placeholderDataFunc: (_, __) => {
-                    // Try to get preview from list cache
-                    Console.WriteLine("Looking for preview in cache...");
-                    
-                    var posts = _queryClient.GetQueryData<List<BlogPost>>(new("blogPosts"));
-                    var preview = posts?.Find(p => p.Id == postId);
-                    
-                    if (preview != null)
-                    {
-                        Console.WriteLine("Found preview! Showing immediately.");
-                        return preview;
-                    }
-                    
-                    Console.WriteLine("No preview found.");
-                    return null;
-                }
-            ),
-            _queryClient
-        );
-
-        // Render UI immediately if placeholder available
-        RenderPost(postQuery);
-
-        // Fetch full data in background
-        await postQuery.ExecuteAsync();
-
-        // Re-render with full data
-        RenderPost(postQuery);
-    }
-
-    private void RenderPost(UseQuery<BlogPost> query)
-    {
-        if (query.IsPlaceholderData)
-        {
-            Console.WriteLine("📄 [PREVIEW]");
-            Console.WriteLine($"Title: {query.Data!.Title}");
-            Console.WriteLine($"Snippet: {query.Data.Snippet}");
-            Console.WriteLine("Loading full content...");
-        }
-        else if (query.IsSuccess)
-        {
-            Console.WriteLine("📄 [FULL CONTENT]");
-            Console.WriteLine($"Title: {query.Data!.Title}");
-            Console.WriteLine($"Content: {query.Data.FullContent}");
-        }
-        else if (query.IsLoading)
-        {
-            Console.WriteLine("Loading...");
-        }
-    }
-
-    public void Dispose() => _queryClient?.Dispose();
-}
 ```
 
 ## Conditional Placeholder Data
@@ -262,19 +204,26 @@ var query = new UseQuery<string>(
 Keep showing old page while fetching new page:
 
 ```csharp
-public class PaginatedPosts
+public class PaginatedPosts : IDisposable
 {
-    private int _currentPage = 1;
+    private readonly QueryClient _queryClient;
+    private UseQuery<List<Post>>? _postsQuery;
 
-    public async Task LoadPageAsync(int page)
+    public PaginatedPosts(QueryClient queryClient)
     {
-        _currentPage = page;
-        
-        var query = new UseQuery<List<Post>>(
+        _queryClient = queryClient;
+    }
+
+    public void LoadPage(int page)
+    {
+        _postsQuery?.Dispose();
+
+        _postsQuery = new UseQuery<List<Post>>(
             new QueryOptions<List<Post>>(
                 queryKey: new("posts", page),
                 queryFn: async ctx => await FetchPostsPageAsync(page),
-                placeholderDataFunc: (previousData, previousQuery) => {
+                placeholderDataFunc: (previousData, previousQuery) =>
+                {
                     // Keep showing old page data while fetching new page
                     // Prevents flickering/loading state
                     return previousData;
@@ -283,26 +232,26 @@ public class PaginatedPosts
             _queryClient
         );
 
-        // Shows previous page as placeholder
-        RenderPosts(query);
+        _postsQuery.OnChange += () =>
+        {
+            if (_postsQuery.IsPlaceholderData)
+            {
+                // Showing previous page data while loading new page
+            }
+            else if (_postsQuery.IsSuccess)
+            {
+                // New page loaded
+            }
 
-        await query.ExecuteAsync();
+            // Notify your UI framework to re-render
+        };
 
-        // Shows new page
-        RenderPosts(query);
+        _ = _postsQuery.ExecuteAsync();
     }
 
-    private void RenderPosts(UseQuery<List<Post>> query)
+    public void Dispose()
     {
-        if (query.IsPlaceholderData)
-        {
-            Console.WriteLine($"Showing page (loading page {_currentPage}...)");
-        }
-        
-        foreach (var post in query.Data ?? new())
-        {
-            Console.WriteLine($"- {post.Title}");
-        }
+        _postsQuery?.Dispose();
     }
 }
 ```
