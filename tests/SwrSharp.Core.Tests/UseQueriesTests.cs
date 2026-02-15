@@ -349,6 +349,145 @@ public class UseQueriesTests : IDisposable
         Assert.Equal("Stale Data Updated", queries.Queries[1].Data); // Refetched
     }
 
+    [Fact]
+    public async Task UseQueries_Combine_ShouldMergeResults()
+    {
+        var queries = new UseQueries<string, List<string>>(
+            _client,
+            combine: results => results
+                .Where(q => q.IsSuccess)
+                .Select(q => q.Data!)
+                .ToList()
+        );
+
+        var queryOptions = Enumerable.Range(1, 3).Select(i =>
+            new QueryOptions<string>(
+                queryKey: new QueryKey("combine", i),
+                queryFn: async ctx =>
+                {
+                    await Task.Delay(10);
+                    return $"Item {i}";
+                }
+            )
+        );
+
+        queries.SetQueries(queryOptions);
+        await queries.ExecuteAllAsync();
+
+        var combined = queries.CombinedResult;
+        Assert.Equal(3, combined.Count);
+        Assert.Contains("Item 1", combined);
+        Assert.Contains("Item 2", combined);
+        Assert.Contains("Item 3", combined);
+    }
+
+    [Fact]
+    public async Task UseQueries_Combine_ShouldUpdateOnChange()
+    {
+        var queries = new UseQueries<int, int>(
+            _client,
+            combine: results => results.Where(q => q.IsSuccess).Sum(q => q.Data)
+        );
+
+        var changeCount = 0;
+        queries.OnChange += () => changeCount++;
+
+        var queryOptions = Enumerable.Range(1, 3).Select(i =>
+            new QueryOptions<int>(
+                queryKey: new QueryKey("sum", i),
+                queryFn: async ctx =>
+                {
+                    await Task.Delay(10);
+                    return i * 10;
+                }
+            )
+        );
+
+        queries.SetQueries(queryOptions);
+        Assert.True(changeCount >= 1);
+
+        await queries.ExecuteAllAsync();
+
+        Assert.Equal(60, queries.CombinedResult); // 10 + 20 + 30
+        Assert.True(changeCount > 1);
+    }
+
+    [Fact]
+    public async Task UseQueries_Combine_ShouldHandlePartialFailures()
+    {
+        var queries = new UseQueries<string, (List<string> Data, bool HasErrors)>(
+            _client,
+            combine: results => (
+                Data: results.Where(q => q.IsSuccess).Select(q => q.Data!).ToList(),
+                HasErrors: results.Any(q => q.IsError)
+            )
+        );
+
+        var queryOptions = Enumerable.Range(1, 3).Select(i =>
+            new QueryOptions<string>(
+                queryKey: new QueryKey("partial", i),
+                queryFn: async ctx =>
+                {
+                    await Task.Delay(10);
+                    if (i == 2) throw new Exception("fail");
+                    return $"Item {i}";
+                },
+                retry: 0
+            )
+        );
+
+        queries.SetQueries(queryOptions);
+        await queries.ExecuteAllAsync();
+
+        var combined = queries.CombinedResult;
+        Assert.Equal(2, combined.Data.Count);
+        Assert.True(combined.HasErrors);
+    }
+
+    [Fact]
+    public async Task UseQueries_Combine_ShouldReflectPendingState()
+    {
+        var queries = new UseQueries<string, bool>(
+            _client,
+            combine: results => results.Any(q => q.IsPending)
+        );
+
+        var queryOptions = new[]
+        {
+            new QueryOptions<string>(
+                queryKey: new QueryKey("pending-check"),
+                queryFn: async ctx =>
+                {
+                    await Task.Delay(10);
+                    return "done";
+                }
+            )
+        };
+
+        queries.SetQueries(queryOptions);
+
+        // Before execution, queries are pending
+        Assert.True(queries.CombinedResult);
+
+        await queries.ExecuteAllAsync();
+
+        // After execution, no longer pending
+        Assert.False(queries.CombinedResult);
+    }
+
+    [Fact]
+    public void UseQueries_Combine_EmptyQueries_ShouldWork()
+    {
+        var queries = new UseQueries<string, int>(
+            _client,
+            combine: results => results.Count
+        );
+
+        queries.SetQueries(Array.Empty<QueryOptions<string>>());
+
+        Assert.Equal(0, queries.CombinedResult);
+    }
+
     public void Dispose()
     {
         _client?.Dispose();

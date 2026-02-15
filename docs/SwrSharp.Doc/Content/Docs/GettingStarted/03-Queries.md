@@ -9,7 +9,7 @@ category: "GettingStarted"
 
 A query is a declarative dependency on an asynchronous source of data that is tied to a **unique key**. A query can be used with any async method (including GET and POST methods) to fetch data from a server.
 
-> **Note**: If your method modifies data on the server, we recommend using Mutations instead (coming soon).
+> **Note**: If your method modifies data on the server, we recommend using [Mutations](/docs/Guides/Mutations) instead.
 
 To create a query in SwrSharp, you need at least:
 

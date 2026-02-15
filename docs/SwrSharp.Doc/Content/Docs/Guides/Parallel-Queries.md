@@ -237,77 +237,6 @@ You can refetch all queries at once:
 await _userQueries.RefetchAllAsync();
 ```
 
-## Example: Loading User Details
-
-Complete example showing dynamic parallel queries:
-
-```csharp
-public class UserListComponent : IDisposable
-{
-    private readonly QueryClient _queryClient;
-    private readonly UseQueries<UserDetails> _userDetailsQueries;
-    
-    public UserListComponent(QueryClient queryClient)
-    {
-        _queryClient = queryClient;
-        _userDetailsQueries = new UseQueries<UserDetails>(queryClient);
-        _userDetailsQueries.OnChange += UpdateUI;
-    }
-    
-    public async Task LoadUserDetailsAsync(List<string> usernames)
-    {
-        // Create query for each username
-        var queries = usernames.Select(username =>
-            new QueryOptions<UserDetails>(
-                queryKey: new("userDetails", username),
-                queryFn: async ctx => {
-                    var (queryKey, signal) = ctx;
-                    var name = (string)queryKey[1]!;
-                    return await _api.GetUserDetailsAsync(name, signal);
-                },
-                staleTime: TimeSpan.FromMinutes(10),
-                retry: 2
-            )
-        );
-        
-        _userDetailsQueries.SetQueries(queries);
-        await _userDetailsQueries.ExecuteAllAsync();
-    }
-    
-    private void UpdateUI()
-    {
-        var queries = _userDetailsQueries.Queries;
-        
-        // Show loading state
-        var isLoading = queries.Any(q => q.IsLoading);
-        if (isLoading)
-        {
-            Console.WriteLine("Loading user details...");
-            return;
-        }
-        
-        // Show results
-        foreach (var query in queries)
-        {
-            if (query.IsSuccess && query.Data != null)
-            {
-                Console.WriteLine($"User: {query.Data.Username} - {query.Data.Email}");
-            }
-            else if (query.IsError)
-            {
-                Console.WriteLine($"Error loading user: {query.Error?.Message}");
-            }
-        }
-    }
-    
-    public void Dispose()
-    {
-        _userDetailsQueries.OnChange -= UpdateUI;
-        _userDetailsQueries.Dispose();
-    }
-}
-```
-
 ## Best Practices
 
 ### 1. **Dispose Resources**
@@ -364,17 +293,62 @@ var queries = userIds.Select(id =>
 );
 ```
 
-## Not Yet Implemented
+## Combine Option
 
-> **`combine` option**: React Query's `useQueries` supports a `combine` option to merge 
-> all query results into a single derived value. This is not yet implemented in SwrSharp.
-> You can achieve similar functionality manually:
->
-> ```csharp
-> // Manual combine
-> var allUsers = _userQueries.Queries
->     .Where(q => q.IsSuccess)
->     .Select(q => q.Data!)
->     .ToList();
-> ```
+`UseQueries<T, TCombined>` supports a `combine` function to merge all query results into a single derived value. The combined result is recalculated whenever any query changes.
+
+```csharp
+// Combine all successful user data into a single list
+var queries = new UseQueries<User, List<User>>(
+    queryClient,
+    combine: results => results
+        .Where(q => q.IsSuccess)
+        .Select(q => q.Data!)
+        .ToList()
+);
+
+var queryOptions = userIds.Select(id =>
+    new QueryOptions<User>(
+        queryKey: new QueryKey("user", id),
+        queryFn: async ctx => await FetchUserAsync(id)
+    )
+);
+
+queries.SetQueries(queryOptions);
+await queries.ExecuteAllAsync();
+
+// Access the combined result
+List<User> allUsers = queries.CombinedResult;
+```
+
+The combine function receives the full list of `UseQuery<T>` instances, so you can derive any shape you need:
+
+```csharp
+// Combine into a summary with loading/error state
+var queries = new UseQueries<Todo, (List<Todo> Data, bool IsPending, bool HasErrors)>(
+    queryClient,
+    combine: results => (
+        Data: results.Where(q => q.IsSuccess).Select(q => q.Data!).ToList(),
+        IsPending: results.Any(q => q.IsPending),
+        HasErrors: results.Any(q => q.IsError)
+    )
+);
+
+queries.SetQueries(todoOptions);
+await queries.ExecuteAllAsync();
+
+var (todos, isPending, hasErrors) = queries.CombinedResult;
+```
+
+You can also aggregate numeric values:
+
+```csharp
+// Sum all order totals
+var queries = new UseQueries<decimal, decimal>(
+    queryClient,
+    combine: results => results
+        .Where(q => q.IsSuccess)
+        .Sum(q => q.Data)
+);
+```
 

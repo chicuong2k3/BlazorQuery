@@ -316,14 +316,14 @@ var mutation = new UseMutation<Todo, UpdateTodoInput>(
         OnMutate = async (variables, context) =>
         {
             // Snapshot the previous value
-            var previousTodos = context.Client.Get<List<Todo>>(new QueryKey("todos"));
+            var previousTodos = context.Client.GetQueryData<List<Todo>>(new QueryKey("todos"));
 
             // Optimistically update the cache
             var updated = previousTodos?.ToList() ?? new List<Todo>();
             var index = updated.FindIndex(t => t.Id == variables.Id);
             if (index >= 0)
                 updated[index] = new Todo { Id = variables.Id, Title = variables.Title };
-            context.Client.Set(new QueryKey("todos"), updated);
+            context.Client.SetQueryData(new QueryKey("todos"), updated);
 
             // Return snapshot for rollback
             return previousTodos;
@@ -333,7 +333,7 @@ var mutation = new UseMutation<Todo, UpdateTodoInput>(
             // Roll back to the previous value
             if (onMutateResult is List<Todo> previousTodos)
             {
-                context.Client.Set(new QueryKey("todos"), previousTodos);
+                context.Client.SetQueryData(new QueryKey("todos"), previousTodos);
             }
         },
         OnSettled = async (data, error, variables, onMutateResult, context) =>

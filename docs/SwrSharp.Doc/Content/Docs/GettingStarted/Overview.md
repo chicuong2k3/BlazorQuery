@@ -21,7 +21,7 @@ SwrSharp is a powerful data fetching and caching library for Blazor applications
 ### 🚀 Performance
 - Efficient caching reduces unnecessary network requests
 - Background refetching keeps data fresh without blocking UI
-- Automatic garbage collection of unused queries
+- Configurable stale time and cache invalidation strategies
 
 ### 🔄 Reliability
 - Intelligent retry logic with exponential backoff

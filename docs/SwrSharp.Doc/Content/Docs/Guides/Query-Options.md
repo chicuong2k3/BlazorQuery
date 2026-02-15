@@ -62,23 +62,6 @@ await queryClient.PrefetchQueryAsync(GroupOptions(23));
 queryClient.SetQueryData(GroupOptions(42).QueryKey, newGroup);
 ```
 
-## Benefits
-
-### 1. **Co-location**
-Query key and query function are defined together, making it easy to maintain and refactor.
-
-### 2. **Type Safety**
-Full type inference - no need to repeat type parameters everywhere.
-
-### 3. **Reusability**
-Define once, use everywhere - components, hooks, services, etc.
-
-### 4. **Consistency**
-All queries for the same resource use the same configuration.
-
-### 5. **Easy Refactoring**
-Change the query logic in one place, all usages update automatically.
-
 ## Advanced Examples
 
 ### With Multiple Parameters
@@ -130,85 +113,6 @@ var basicUser = new UseQuery<User>(UserOptions(1), client);
 var detailedUser = new UseQuery<User>(UserOptions(1, includeDetails: true), client);
 ```
 
-### Organizing in a Service/Repository Pattern
-
-```csharp
-public class TodoQueryFactory
-{
-    private readonly ITodoApi _api;
-
-    public TodoQueryFactory(ITodoApi api)
-    {
-        _api = api;
-    }
-
-    public QueryOptions<List<Todo>> List(string? status = null)
-    {
-        return new QueryOptions<List<Todo>>(
-            queryKey: new("todos", "list", status ?? "all"),
-            queryFn: async ctx => {
-                var (_, signal) = ctx;
-                return await _api.GetTodosAsync(status, signal);
-            },
-            staleTime: TimeSpan.FromMinutes(5)
-        );
-    }
-
-    public QueryOptions<Todo> ById(int id)
-    {
-        return new QueryOptions<Todo>(
-            queryKey: new("todos", "detail", id),
-            queryFn: async ctx => {
-                var (queryKey, signal) = ctx;
-                var todoId = (int)queryKey[2]!;
-                return await _api.GetTodoByIdAsync(todoId, signal);
-            },
-            staleTime: TimeSpan.FromMinutes(10)
-        );
-    }
-
-    public QueryOptions<List<Todo>> Search(string query)
-    {
-        return new QueryOptions<List<Todo>>(
-            queryKey: new("todos", "search", query),
-            queryFn: async ctx => {
-                var (queryKey, signal) = ctx;
-                var searchQuery = (string)queryKey[2]!;
-                return await _api.SearchTodosAsync(searchQuery, signal);
-            },
-            staleTime: TimeSpan.FromSeconds(30)
-        );
-    }
-}
-
-// Usage in components
-public class TodoComponent
-{
-    private readonly TodoQueryFactory _todoQueries;
-    private readonly QueryClient _queryClient;
-
-    public TodoComponent(TodoQueryFactory todoQueries, QueryClient queryClient)
-    {
-        _todoQueries = todoQueries;
-        _queryClient = queryClient;
-    }
-
-    public async Task LoadTodoAsync(int id)
-    {
-        var query = new UseQuery<Todo>(_todoQueries.ById(id), _queryClient);
-        await query.ExecuteAsync();
-        // Use query.Data...
-    }
-
-    public async Task SearchTodosAsync(string searchQuery)
-    {
-        var query = new UseQuery<List<Todo>>(_todoQueries.Search(searchQuery), _queryClient);
-        await query.ExecuteAsync();
-        // Use query.Data...
-    }
-}
-```
-
 ## Overriding Options
 
 You can still override options at the component level while keeping the base configuration:
@@ -236,26 +140,10 @@ var customQuery = new UseQuery<Group>(
 );
 ```
 
-## Best Practices
-
-### ✅ DO:
-- Create factory methods for each query type
-- Use descriptive method names: `UserById()`, `TodoList()`, `SearchResults()`
-- Group related queries in service/factory classes
-- Include all necessary parameters in the factory method
-- Use consistent naming conventions
-
-### ❌ DON'T:
-- Repeat query configurations inline
-- Mix query logic across multiple files
-- Create too many variations of the same query
-- Forget to update all usages when changing query logic
-
 ## Summary
 
 Using factory methods to create reusable `QueryOptions<T>` provides:
-- ✅ Better organization and maintainability
-- ✅ Full type safety
-- ✅ Easy refactoring
-- ✅ Consistent query configuration
-- ✅ Reduced boilerplate
+- Better organization and maintainability
+- Easy refactoring
+- Consistent query configuration
+- Reduced boilerplate

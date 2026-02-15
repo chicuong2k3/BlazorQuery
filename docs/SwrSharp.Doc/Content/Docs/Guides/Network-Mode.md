@@ -122,9 +122,19 @@ SwrSharp distinguishes between **logical loading** and **active fetching**:
 **Key insight**: `IsLoading` is `true` when there's no data yet AND the query is either 
 actively fetching or paused due to network conditions.
 
-# Not Yet Implemented
+# Mutations and Network Mode
 
-> **Mutations**: SwrSharp does not yet implement Mutations. Network mode currently only 
-> applies to Queries. When Mutations are added, they will support the same network modes.
->
-> To customize online detection, implement `IOnlineManager` and pass it to `QueryClient`.
+Mutations also respect network mode settings. When using `NetworkMode.Online` (the default), mutations will throw an `InvalidOperationException` if attempted while offline.
+
+```csharp
+var mutation = new UseMutation<Todo, CreateTodoInput>(
+    new MutationOptions<Todo, CreateTodoInput>
+    {
+        MutationFn = async input => await CreateTodo(input),
+        NetworkMode = NetworkMode.Online // Default - requires network
+    },
+    queryClient
+);
+```
+
+To customize online detection, implement `IOnlineManager` and pass it to `QueryClient`.

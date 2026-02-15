@@ -139,7 +139,7 @@ var mutation = new UseMutation<Todo, UpdateTodoInput>(
         MutationFn = async input => await UpdateTodo(input),
         OnMutate = async (variables, context) =>
         {
-            var previous = context.Client.Get<List<Todo>>(new QueryKey("todos"));
+            var previous = context.Client.GetQueryData<List<Todo>>(new QueryKey("todos"));
             // ... perform optimistic update ...
             return previous;
         },
@@ -147,7 +147,7 @@ var mutation = new UseMutation<Todo, UpdateTodoInput>(
         {
             if (onMutateResult is List<Todo> previous)
             {
-                context.Client.Set(new QueryKey("todos"), previous);
+                context.Client.SetQueryData(new QueryKey("todos"), previous);
             }
         },
         OnSettled = async (data, error, variables, onMutateResult, context) =>

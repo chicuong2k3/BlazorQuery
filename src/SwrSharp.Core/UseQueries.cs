@@ -69,6 +69,33 @@ public class UseQueries<T> : IDisposable
 }
 
 
+/// <summary>
+/// UseQueries with a combine function that merges all query results into a single derived value.
+/// </summary>
+public class UseQueries<T, TCombined> : IDisposable
+{
+    private readonly UseQueries<T> _inner;
+    private readonly Func<IReadOnlyList<UseQuery<T>>, TCombined> _combine;
+
+    public TCombined CombinedResult => _combine(_inner.Queries);
+    public IReadOnlyList<UseQuery<T>> Queries => _inner.Queries;
+    public event Action? OnChange;
+
+    public UseQueries(QueryClient client, Func<IReadOnlyList<UseQuery<T>>, TCombined> combine)
+    {
+        _inner = new UseQueries<T>(client);
+        _combine = combine ?? throw new ArgumentNullException(nameof(combine));
+        _inner.OnChange += () => OnChange?.Invoke();
+    }
+
+    public void SetQueries(IEnumerable<QueryOptions<T>> options) => _inner.SetQueries(options);
+    public Task ExecuteAllAsync(CancellationToken? ct = null) => _inner.ExecuteAllAsync(ct);
+    public Task RefetchAllAsync(CancellationToken? ct = null) => _inner.RefetchAllAsync(ct);
+
+    public void Dispose() => _inner.Dispose();
+}
+
+
 public class UseQueries : IDisposable
 {
     private readonly QueryClient _client;

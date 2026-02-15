@@ -175,54 +175,43 @@ var query3 = new UseQuery<List<Todo>>(
 
 ### After Mutations
 
-Invalidate queries after creating, updating, or deleting data:
+Use `UseMutation`'s lifecycle callbacks to invalidate queries after creating, updating, or deleting data:
 
 ```csharp
-public class TodoService
-{
-    private readonly QueryClient _queryClient;
-    private readonly HttpClient _httpClient;
-
-    public async Task<Todo> CreateTodoAsync(string title)
+var createTodo = new UseMutation<Todo, CreateTodoInput>(
+    new MutationOptions<Todo, CreateTodoInput>
     {
-        // Create todo
-        var response = await _httpClient.PostAsJsonAsync("/api/todos", new { title });
-        var todo = await response.Content.ReadFromJsonAsync<Todo>();
-
-        // Invalidate todos list to refetch with new item
-        _queryClient.InvalidateQueries(new QueryFilters
+        MutationFn = async input => await PostTodo(input),
+        OnSuccess = async (data, variables, onMutateResult, context) =>
         {
-            QueryKey = new("todos")
-        });
+            // Invalidate todos list to refetch with new item
+            context.Client.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new QueryKey("todos")
+            });
+        }
+    },
+    queryClient
+);
 
-        return todo!;
-    }
-
-    public async Task UpdateTodoAsync(int id, string title)
+var updateTodo = new UseMutation<Todo, UpdateTodoInput>(
+    new MutationOptions<Todo, UpdateTodoInput>
     {
-        // Update todo
-        await _httpClient.PutAsJsonAsync($"/api/todos/{id}", new { title });
-
-        // Invalidate both list and detail
-        _queryClient.InvalidateQueries(new QueryFilters
+        MutationFn = async input => await UpdateTodo(input),
+        OnSuccess = async (data, variables, onMutateResult, context) =>
         {
-            QueryKey = new("todos")
-        });
-    }
-
-    public async Task DeleteTodoAsync(int id)
-    {
-        // Delete todo
-        await _httpClient.DeleteAsync($"/api/todos/{id}");
-
-        // Invalidate all todos queries
-        _queryClient.InvalidateQueries(new QueryFilters
-        {
-            QueryKey = new("todos")
-        });
-    }
-}
+            // Invalidate both list and detail
+            context.Client.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new QueryKey("todos")
+            });
+        }
+    },
+    queryClient
+);
 ```
+
+See [Invalidations from Mutations](/docs/Guides/Invalidations-from-Mutations) for more patterns.
 
 ### User Actions
 
@@ -412,13 +401,25 @@ public class Todo
 ### 1. **Invalidate After Mutations**
 
 ```csharp
-// ✅ Good: Invalidate after successful mutation
-await CreateTodoAsync();
-queryClient.InvalidateQueries(new QueryFilters { QueryKey = new("todos") });
+// ✅ Good: Use UseMutation with OnSuccess to invalidate
+var mutation = new UseMutation<Todo, CreateTodoInput>(
+    new MutationOptions<Todo, CreateTodoInput>
+    {
+        MutationFn = async input => await PostTodo(input),
+        OnSuccess = async (data, variables, onMutateResult, context) =>
+        {
+            context.Client.InvalidateQueries(new QueryFilters
+            {
+                QueryKey = new QueryKey("todos")
+            });
+        }
+    },
+    queryClient
+);
 
-// ❌ Bad: Forget to invalidate
-await CreateTodoAsync();
-// Users see stale data!
+// ❌ Bad: Mutate without invalidating
+mutation.Mutate(new CreateTodoInput { Title = "New" });
+// Users see stale data if no OnSuccess invalidation!
 ```
 
 ### 2. **Use Prefix Matching**

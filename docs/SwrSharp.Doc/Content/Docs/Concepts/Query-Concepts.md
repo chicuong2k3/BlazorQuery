@@ -62,9 +62,11 @@ Success + Idle
 
 Query data is cached until:
 
-1. **Marked as stale** by `staleTime`
-2. **Invalidated manually** by `InvalidateQueries()`
-3. **Garbage collected** after `gcTime` of inactivity
+1. **Marked as stale** by `staleTime` — stale queries refetch on triggers like window focus
+2. **Invalidated manually** by `InvalidateQueries()` — marks queries for immediate refetch
+3. **Removed explicitly** by `Invalidate(key)` or `Dispose()` — clears cache entries
+
+> **Note**: SwrSharp does not yet implement automatic garbage collection (`gcTime`). Cache entries persist until manually removed or the `QueryClient` is disposed.
 
 ## Fetching vs Loading
 
