@@ -26,6 +26,7 @@ public class QueryClient : IDisposable
     /// Type-specific default query functions.
     /// </summary>
     private readonly ConcurrentDictionary<Type, object> _defaultQueryFns = new();
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _scopeSemaphores = new();
 
     /// <summary>
     /// Sets a type-specific default query function.
@@ -383,9 +384,22 @@ public class QueryClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets or creates a semaphore for serializing mutations within the same scope.
+    /// </summary>
+    internal SemaphoreSlim GetScopeSemaphore(string scopeId)
+    {
+        return _scopeSemaphores.GetOrAdd(scopeId, _ => new SemaphoreSlim(1, 1));
+    }
+
     public void Dispose()
     {
         _cache.Clear();
+        foreach (var semaphore in _scopeSemaphores.Values)
+        {
+            semaphore.Dispose();
+        }
+        _scopeSemaphores.Clear();
     }
 
     /// <summary>
