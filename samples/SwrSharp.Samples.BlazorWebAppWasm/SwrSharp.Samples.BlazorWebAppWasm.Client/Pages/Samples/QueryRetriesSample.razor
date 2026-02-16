@@ -47,13 +47,13 @@ else if (_customRetry.IsSuccess)
     private UseQuery<string> _customRetry = null!;
     private static int _attemptCount;
     private static int _customAttemptCount;
+    private readonly int _retryKeyId = Random.Shared.Next();
+    private readonly int _customRetryKeyId = Random.Shared.Next();
 
     protected override void OnParametersSet()
     {
-        _attemptCount = 0;
-
         _retryQuery = UseQuery(new QueryOptions<string>(
-            queryKey: new QueryKey("retry-demo", Random.Shared.Next()),
+            queryKey: new QueryKey("retry-demo", _retryKeyId),
             queryFn: async _ =>
             {
                 await Task.Delay(200);
@@ -66,10 +66,8 @@ else if (_customRetry.IsSuccess)
             retryDelay: TimeSpan.FromMilliseconds(500)
         ));
 
-        _customAttemptCount = 0;
-
         _customRetry = UseQuery(new QueryOptions<string>(
-            queryKey: new QueryKey("custom-retry", Random.Shared.Next()),
+            queryKey: new QueryKey("custom-retry", _customRetryKeyId),
             queryFn: async _ =>
             {
                 await Task.Delay(200);

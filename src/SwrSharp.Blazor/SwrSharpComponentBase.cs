@@ -84,6 +84,38 @@ public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
         return query;
     }
 
+    /// <summary>
+    /// Creates or retrieves a UseQueries hook for dynamic parallel queries.
+    /// Automatically updates when the set of query keys changes.
+    /// </summary>
+    protected UseQueries<T> UseQueries<T>(string hookId, IEnumerable<QueryOptions<T>> options)
+    {
+        var hookKey = $"queries:{hookId}";
+        var optionsList = options.ToList();
+        var keysSignature = string.Join("|", optionsList.Select(o => o.QueryKey.ToString()));
+
+        if (_hooks.TryGetValue(hookKey, out var existing))
+        {
+            var (queries, prevSignature) = ((UseQueries<T>, string))existing;
+            if (prevSignature == keysSignature)
+                return queries;
+
+            // Keys changed — reconfigure queries
+            _hooks[hookKey] = (queries, keysSignature);
+            queries.SetQueries(optionsList);
+            _pendingExecutions.Add(() => queries.ExecuteAllAsync());
+            return queries;
+        }
+
+        var newQueries = new UseQueries<T>(QueryClient);
+        newQueries.OnChange += () => InvokeAsync(StateHasChanged);
+        _hooks[hookKey] = (newQueries, keysSignature);
+        _disposables.Add(newQueries);
+        newQueries.SetQueries(optionsList);
+        _pendingExecutions.Add(() => newQueries.ExecuteAllAsync());
+        return newQueries;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_pendingExecutions.Count > 0 && !_disposed)

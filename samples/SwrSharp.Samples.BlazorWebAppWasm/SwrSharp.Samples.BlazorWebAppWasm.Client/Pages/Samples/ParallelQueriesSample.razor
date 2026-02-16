@@ -64,22 +64,60 @@
     </div>
 </div>
 
+<hr class="my-4"/>
+
+<h2>Dynamic Parallel Queries with UseQueries</h2>
+<p>Fetch a dynamic list of users in parallel using <code>UseQueries</code>. Add/remove IDs to see queries update automatically.</p>
+
+<div class="mb-3">
+    @foreach (var id in _userIds)
+    {
+        <span class="badge bg-primary me-1">User @id</span>
+    }
+</div>
+<div class="mb-3">
+    <button class="btn btn-sm btn-outline-success me-1" @onclick="AddUser">Add User</button>
+    <button class="btn btn-sm btn-outline-danger" @onclick="RemoveUser" disabled="@(_userIds.Count <= 1)">Remove User</button>
+</div>
+
+@foreach (var q in _dynamicUsers.Queries)
+{
+    <div class="card mb-2">
+        <div class="card-body py-2">
+            @if (q.IsPending)
+            {
+                <em>Loading @q.Options.QueryKey...</em>
+            }
+            else if (q.IsSuccess)
+            {
+                <span class="text-success">@q.Data</span>
+            }
+            else if (q.IsError)
+            {
+                <span class="text-danger">Error: @q.Error?.Message</span>
+            }
+        </div>
+    </div>
+}
+
 @code {
     private UseQuery<List<string>> _users = null!;
     private UseQuery<List<string>> _products = null!;
     private UseQuery<string> _settings = null!;
+    private UseQueries<string> _dynamicUsers = null!;
+    private readonly List<int> _userIds = [1, 2, 3];
 
     protected override void OnParametersSet()
     {
         _users = UseQuery(new QueryOptions<List<string>>(
             queryKey: new QueryKey("parallel-users"),
-            queryFn: async _ => { await Task.Delay(500); return new List<string> { "Alice", "Bob", "Charlie" }; },
+            queryFn: async _ => { await Task.Delay(500); return ["Alice", "Bob", "Charlie"]; },
             staleTime: TimeSpan.FromMinutes(1)
         ));
 
         _products = UseQuery(new QueryOptions<List<string>>(
             queryKey: new QueryKey("parallel-products"),
-            queryFn: async _ => { await Task.Delay(800); return new List<string> { "Widget", "Gadget", "Doohickey" }; },
+            queryFn: async _ => { await Task.Delay(800); return ["Widget", "Gadget", "Doohickey"]; },
             staleTime: TimeSpan.FromMinutes(1)
         ));
 
@@ -88,5 +126,30 @@
             queryFn: async _ => { await Task.Delay(200); return "Dark Mode"; },
             staleTime: TimeSpan.FromMinutes(1)
         ));
+
+        _dynamicUsers = UseQueries("dynamic-users", _userIds.Select(id =>
+            new QueryOptions<string>(
+                queryKey: new QueryKey("dynamic-user", id),
+                queryFn: async ctx =>
+                {
+                    var userId = (int)ctx.QueryKey[1];
+                    await Task.Delay(300 + userId * 100);
+                    return $"User #{userId}: loaded at {DateTime.Now:T}";
+                },
+                staleTime: TimeSpan.FromSeconds(30)
+            )
+        ));
+    }
+
+    private void AddUser()
+    {
+        var nextId = _userIds.Count > 0 ? _userIds.Max() + 1 : 1;
+        _userIds.Add(nextId);
+    }
+
+    private void RemoveUser()
+    {
+        if (_userIds.Count > 1)
+            _userIds.RemoveAt(_userIds.Count - 1);
     }
 }

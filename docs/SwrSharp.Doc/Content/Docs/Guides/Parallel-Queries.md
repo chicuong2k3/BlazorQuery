@@ -5,8 +5,6 @@ order: 6
 category: "Guides"
 ---
 
-# Parallel Queries
-
 "Parallel" queries are queries that are executed in parallel, or at the same time, to maximize fetching concurrency.
 
 ## Manual Parallel Queries
