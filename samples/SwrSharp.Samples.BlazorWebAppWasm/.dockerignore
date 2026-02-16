@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.vs/
+.git/
+node_modules/
+*.user
+*.suo
+build.log
+**/node_modules/
+**/wwwroot/lib/**
+
