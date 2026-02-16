@@ -4,77 +4,263 @@
 <PageTitle>Background Fetching Indicators</PageTitle>
 
 <h1>Background Fetching Indicators</h1>
-<p>Shows how to display global and per-query background fetching indicators.</p>
+<p>Understand the difference between initial loading and background refetching.</p>
 
-<h4>Global Fetching Indicator</h4>
-<div class="alert @(QueryClient.IsFetching ? "alert-warning" : "alert-secondary")">
-    @(QueryClient.IsFetching ? "Fetching somewhere..." : "All queries idle")
+<h2>Global Fetching Indicator</h2>
+<p>Shows activity when <strong>any</strong> query is fetching — useful for a top-bar spinner or progress indicator.</p>
+<div class="alert @(QueryClient.IsFetching ? "alert-warning" : "alert-success") d-flex align-items-center">
+    @if (QueryClient.IsFetching)
+    {
+        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+        <span>Syncing data...</span>
+    }
+    else
+    {
+        <span>All queries idle — data is up to date</span>
+    }
 </div>
 
-<h4>Per-Query Indicators</h4>
+<hr class="my-4"/>
+
+<h2>IsFetching vs IsFetchingBackground vs IsLoading</h2>
+<p>These three properties track different aspects of fetching state:</p>
+<table class="table table-bordered table-sm">
+    <thead>
+        <tr>
+            <th>Property</th>
+            <th>True when...</th>
+            <th>Use for</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>IsLoading</code></td>
+            <td>Fetching with <strong>no data yet</strong> (first load)</td>
+            <td>Full-screen skeleton / spinner</td>
+        </tr>
+        <tr>
+            <td><code>IsFetching</code></td>
+            <td><strong>Any</strong> fetch (initial + background)</td>
+            <td>Global activity indicator</td>
+        </tr>
+        <tr>
+            <td><code>IsFetchingBackground</code></td>
+            <td>Refetching while showing <strong>stale data</strong></td>
+            <td>Subtle "Updating..." badge</td>
+        </tr>
+    </tbody>
+</table>
+
+<h4>Live State Monitor</h4>
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Stock Price</span>
+        <div>
+            @if (_stock.IsFetchingBackground)
+            {
+                <span class="badge bg-warning me-1">IsFetchingBackground</span>
+            }
+            @if (_stock.IsFetching)
+            {
+                <span class="badge bg-info me-1">IsFetching</span>
+            }
+            @if (_stock.IsLoading)
+            {
+                <span class="badge bg-danger me-1">IsLoading</span>
+            }
+        </div>
+    </div>
+    <div class="card-body">
+        @if (_stock.IsLoading)
+        {
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                <span>Loading stock data for the first time...</span>
+            </div>
+            <p class="text-muted mt-2 mb-0">
+                <small><code>IsLoading = true</code> → no data yet, show full loading UI</small>
+            </p>
+        }
+        else if (_stock.IsSuccess)
+        {
+            <h3 class="mb-1">@_stock.Data</h3>
+            @if (_stock.IsFetchingBackground)
+            {
+                <p class="text-warning mb-0">
+                    <small>
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        Refreshing in background... (stale data still visible)
+                    </small>
+                </p>
+                <p class="text-muted mt-1 mb-0">
+                    <small><code>IsFetchingBackground = true</code> → has data + refetching</small>
+                </p>
+            }
+            else
+            {
+                <p class="text-success mb-0">
+                    <small>Data is fresh</small>
+                </p>
+                <p class="text-muted mt-1 mb-0">
+                    <small><code>IsFetching = false</code> → idle, no fetch in progress</small>
+                </p>
+            }
+        }
+    </div>
+    <div class="card-footer">
+        <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => _stock.RefetchAsync()">
+            Refetch (triggers IsFetchingBackground)
+        </button>
+        <button class="btn btn-sm btn-outline-danger" @onclick="InvalidateStock">
+            Invalidate (triggers IsLoading if no cache)
+        </button>
+    </div>
+</div>
+
+<hr class="my-4"/>
+
+<h2>Practical Example: Dashboard with Background Updates</h2>
+<p>Real-world scenario: a dashboard that auto-refreshes stale data. Users see current data while fresh data loads behind the scenes.</p>
+
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between">
-                <span>Users</span>
-                @if (_users.IsFetchingBackground)
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Active Users</span>
+                @if (_activeUsers.IsFetchingBackground)
                 {
-                    <span class="badge bg-warning">Background refresh</span>
+                    <span class="spinner-border spinner-border-sm text-warning" role="status"></span>
                 }
             </div>
-            <div class="card-body">
-                @if (_users.IsPending)
+            <div class="card-body text-center">
+                @if (_activeUsers.IsLoading)
                 {
-                    <p><em>Loading...</em></p>
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-6" style="height:2rem;"></span>
+                    </div>
                 }
-                else if (_users.IsSuccess)
+                else if (_activeUsers.IsSuccess)
                 {
-                    <p>@string.Join(", ", _users.Data!)</p>
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => _users.RefetchAsync()">Refetch</button>
+                    <h2 class="mb-0">@_activeUsers.Data</h2>
                 }
             </div>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between">
-                <span>Stats</span>
-                @if (_stats.IsFetchingBackground)
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Revenue Today</span>
+                @if (_revenue.IsFetchingBackground)
                 {
-                    <span class="badge bg-warning">Background refresh</span>
+                    <span class="spinner-border spinner-border-sm text-warning" role="status"></span>
                 }
             </div>
-            <div class="card-body">
-                @if (_stats.IsPending)
+            <div class="card-body text-center">
+                @if (_revenue.IsLoading)
                 {
-                    <p><em>Loading...</em></p>
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-6" style="height:2rem;"></span>
+                    </div>
                 }
-                else if (_stats.IsSuccess)
+                else if (_revenue.IsSuccess)
                 {
-                    <p>@_stats.Data</p>
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => _stats.RefetchAsync()">Refetch</button>
+                    <h2 class="mb-0">@_revenue.Data</h2>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Error Rate</span>
+                @if (_errorRate.IsFetchingBackground)
+                {
+                    <span class="spinner-border spinner-border-sm text-warning" role="status"></span>
+                }
+            </div>
+            <div class="card-body text-center">
+                @if (_errorRate.IsLoading)
+                {
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-6" style="height:2rem;"></span>
+                    </div>
+                }
+                else if (_errorRate.IsSuccess)
+                {
+                    <h2 class="mb-0">@_errorRate.Data</h2>
                 }
             </div>
         </div>
     </div>
 </div>
+<button class="btn btn-outline-primary" @onclick="RefetchDashboard">
+    Refetch All (watch background spinners)
+</button>
 
 @code {
-    private UseQuery<List<string>> _users = null!;
-    private UseQuery<string> _stats = null!;
+    // --- State Monitor ---
+    private UseQuery<string> _stock = null!;
+
+    // --- Dashboard ---
+    private UseQuery<string> _activeUsers = null!;
+    private UseQuery<string> _revenue = null!;
+    private UseQuery<string> _errorRate = null!;
 
     protected override void OnParametersSet()
     {
-        _users = UseQuery(new QueryOptions<List<string>>(
-            queryKey: new QueryKey("bg-users"),
-            queryFn: async _ => { await Task.Delay(800); return new List<string> { "Alice", "Bob", "Charlie" }; },
+        _stock = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("bg-stock"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(1500);
+                var price = 150 + Random.Shared.Next(-20, 20) + Random.Shared.NextDouble();
+                return $"ACME: ${price:F2}";
+            },
             staleTime: TimeSpan.FromSeconds(5)
         ));
 
-        _stats = UseQuery(new QueryOptions<string>(
-            queryKey: new QueryKey("bg-stats"),
-            queryFn: async _ => { await Task.Delay(600); return $"Total users: {Random.Shared.Next(100, 999)} (at {DateTime.Now:T})"; },
-            staleTime: TimeSpan.FromSeconds(5)
+        _activeUsers = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("bg-active-users"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(800);
+                return $"{Random.Shared.Next(1200, 3500):N0}";
+            },
+            staleTime: TimeSpan.FromSeconds(10)
         ));
+
+        _revenue = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("bg-revenue"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(1200);
+                var amount = Random.Shared.Next(8000, 25000) + Random.Shared.NextDouble();
+                return $"${amount:N2}";
+            },
+            staleTime: TimeSpan.FromSeconds(10)
+        ));
+
+        _errorRate = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("bg-error-rate"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(600);
+                var rate = Random.Shared.NextDouble() * 2;
+                return $"{rate:F2}%";
+            },
+            staleTime: TimeSpan.FromSeconds(10)
+        ));
+    }
+
+    private void InvalidateStock()
+    {
+        QueryClient.InvalidateQueries(new QueryFilters { QueryKey = new QueryKey("bg-stock"), Exact = true });
+    }
+
+    private void RefetchDashboard()
+    {
+        _ = _activeUsers.RefetchAsync();
+        _ = _revenue.RefetchAsync();
+        _ = _errorRate.RefetchAsync();
     }
 }

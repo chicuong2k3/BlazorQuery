@@ -675,10 +675,7 @@ public class UseQuery<T> : IDisposable
                         entry.FetchTime = DateTime.UtcNow;
 
                     // start the timer so we refetch automatically when stale
-                    if (!isRefetch)
-                    {
-                        StartStaleTimer();
-                    }
+                    StartStaleTimer();
 
                     return;
                 }
@@ -826,10 +823,7 @@ public class UseQuery<T> : IDisposable
         }
         finally
         {
-            if (!isRefetch)
-            {
-                IsFetchingBackground = false;
-            }
+            IsFetchingBackground = false;
 
             if (FetchStatus != FetchStatus.Paused)
             {
