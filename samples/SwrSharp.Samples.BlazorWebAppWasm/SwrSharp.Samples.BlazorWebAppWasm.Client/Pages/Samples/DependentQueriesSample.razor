@@ -35,12 +35,139 @@ else if (_posts.IsSuccess)
     </ul>
 }
 
+<hr class="my-4"/>
+
+<h2>Dependent Queries with UseQueries</h2>
+<p>First query returns a list of user IDs, then <code>UseQueries</code> fans out into parallel dependent queries to fetch each user's messages.</p>
+
+<h4>Step 1: Load User IDs</h4>
+@if (_userIds.IsPending)
+{
+    <p><em>Loading user IDs...</em></p>
+}
+else if (_userIds.IsSuccess)
+{
+    <div class="alert alert-info">
+        Found @_userIds.Data!.Count users:
+        @foreach (var id in _userIds.Data!)
+        {
+            <span class="badge bg-primary me-1">User @id</span>
+        }
+    </div>
+}
+
+<h4>Step 2: Load Messages for Each User (parallel)</h4>
+@if (!_userIds.IsSuccess)
+{
+    <p class="text-muted">Waiting for user IDs...</p>
+}
+else if (_messages != null)
+{
+    @foreach (var q in _messages.Queries)
+    {
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                @if (q.IsPending)
+                {
+                    <em>Loading @q.Options.QueryKey...</em>
+                }
+                else if (q.IsSuccess)
+                {
+                    <strong>@q.Options.QueryKey</strong>
+                    <ul class="list-unstyled mb-0 ms-3">
+                        @foreach (var msg in q.Data!)
+                        {
+                            <li>@msg</li>
+                        }
+                    </ul>
+                }
+                else if (q.IsError)
+                {
+                    <span class="text-danger">Error: @q.Error?.Message</span>
+                }
+            </div>
+        </div>
+    }
+}
+
+<hr class="my-4"/>
+
+<h2>Multiple Dependencies (Chained)</h2>
+<p>Three queries chained: <strong>User → Organization → Team</strong>. Each waits for the previous one using <code>enabled</code>.</p>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Step 1: User</div>
+            <div class="card-body">
+                @if (_chainUser.IsPending)
+                {
+                    <em>Loading user...</em>
+                }
+                else if (_chainUser.IsSuccess)
+                {
+                    <span class="text-success">@_chainUser.Data!.Name (Org: @_chainUser.Data!.OrgId)</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Step 2: Organization</div>
+            <div class="card-body">
+                @if (!_chainUser.IsSuccess)
+                {
+                    <span class="text-muted">Waiting for user...</span>
+                }
+                else if (_chainOrg.IsPending)
+                {
+                    <em>Loading org...</em>
+                }
+                else if (_chainOrg.IsSuccess)
+                {
+                    <span class="text-success">@_chainOrg.Data!.Name (Team: @_chainOrg.Data!.DefaultTeamId)</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Step 3: Team</div>
+            <div class="card-body">
+                @if (!_chainOrg.IsSuccess)
+                {
+                    <span class="text-muted">Waiting for organization...</span>
+                }
+                else if (_chainTeam.IsPending)
+                {
+                    <em>Loading team...</em>
+                }
+                else if (_chainTeam.IsSuccess)
+                {
+                    <span class="text-success">@_chainTeam.Data</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
+    // --- Basic Dependent Query ---
     private UseQuery<UserInfo> _user = null!;
     private UseQuery<List<string>> _posts = null!;
 
+    // --- Dependent Queries with UseQueries ---
+    private UseQuery<List<int>> _userIds = null!;
+    private UseQueries<List<string>>? _messages;
+
+    // --- Multiple Dependencies (Chained) ---
+    private UseQuery<ChainUser> _chainUser = null!;
+    private UseQuery<ChainOrg> _chainOrg = null!;
+    private UseQuery<string> _chainTeam = null!;
+
     protected override void OnParametersSet()
     {
+        // === Basic Dependent Query ===
         _user = UseQuery(new QueryOptions<UserInfo>(
             queryKey: new QueryKey("dep-user"),
             queryFn: async _ =>
@@ -54,24 +181,106 @@ else if (_posts.IsSuccess)
         var userId = _user.Data?.Id;
         _posts = UseQuery(new QueryOptions<List<string>>(
             queryKey: new QueryKey("dep-posts", userId ?? 0),
-            queryFn: async _ =>
+            queryFn: async ctx =>
             {
+                var id = (int)ctx.QueryKey[1];
                 await Task.Delay(400);
                 return new List<string>
                 {
-                    $"Post by user {userId}: Getting started with SwrSharp",
-                    $"Post by user {userId}: Blazor integration tips",
-                    $"Post by user {userId}: Advanced caching patterns"
+                    $"Post by user {id}: Getting started with SwrSharp",
+                    $"Post by user {id}: Blazor integration tips",
+                    $"Post by user {id}: Advanced caching patterns"
                 };
             },
             enabled: userId != null,
             staleTime: TimeSpan.FromMinutes(1)
         ));
+
+        // === Dependent Queries with UseQueries ===
+        _userIds = UseQuery(new QueryOptions<List<int>>(
+            queryKey: new QueryKey("dep-user-ids"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(600);
+                return new List<int> { 1, 2, 3 };
+            },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        if (_userIds.IsSuccess && _userIds.Data != null)
+        {
+            _messages = UseQueries("dep-messages", _userIds.Data.Select(id =>
+                new QueryOptions<List<string>>(
+                    queryKey: new QueryKey("dep-messages", id),
+                    queryFn: async ctx =>
+                    {
+                        var uid = (int)ctx.QueryKey[1];
+                        await Task.Delay(300 + uid * 100);
+                        return new List<string>
+                        {
+                            $"Message from user {uid}: Hello!",
+                            $"Message from user {uid}: How are you?"
+                        };
+                    },
+                    staleTime: TimeSpan.FromSeconds(30)
+                )
+            ));
+        }
+
+        // === Multiple Dependencies (Chained) ===
+        _chainUser = UseQuery(new QueryOptions<ChainUser>(
+            queryKey: new QueryKey("chain-user"),
+            queryFn: async _ =>
+            {
+                await Task.Delay(500);
+                return new ChainUser { Name = "Bob", OrgId = "org-7" };
+            },
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        var orgId = _chainUser.Data?.OrgId;
+        _chainOrg = UseQuery(new QueryOptions<ChainOrg>(
+            queryKey: new QueryKey("chain-org", orgId ?? ""),
+            queryFn: async ctx =>
+            {
+                var oid = (string)ctx.QueryKey[1];
+                await Task.Delay(400);
+                return new ChainOrg { Name = $"Acme Corp ({oid})", DefaultTeamId = "team-42" };
+            },
+            enabled: orgId != null,
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
+
+        var teamId = _chainOrg.Data?.DefaultTeamId;
+        _chainTeam = UseQuery(new QueryOptions<string>(
+            queryKey: new QueryKey("chain-team", teamId ?? ""),
+            queryFn: async ctx =>
+            {
+                var tid = (string)ctx.QueryKey[1];
+                await Task.Delay(300);
+                return $"Engineering Team ({tid}) — 12 members";
+            },
+            enabled: teamId != null,
+            staleTime: TimeSpan.FromMinutes(1)
+        ));
     }
 
+    // --- Models ---
     public class UserInfo
     {
         public int Id { get; init; }
         public string Name { get; init; } = "";
+    }
+
+    public class ChainUser
+    {
+        public string Name { get; init; } = "";
+        public string OrgId { get; init; } = "";
+    }
+
+    public class ChainOrg
+    {
+        public string Name { get; init; } = "";
+        public string DefaultTeamId { get; init; } = "";
     }
 }

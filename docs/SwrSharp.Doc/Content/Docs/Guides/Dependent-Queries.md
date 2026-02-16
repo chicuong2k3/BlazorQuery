@@ -5,8 +5,6 @@ order: 7
 category: "Guides"
 ---
 
-# Dependent Queries
-
 Dependent (or serial) queries depend on previous ones to finish before they can execute. This is done **reactively** — you subscribe to `OnChange` and trigger dependent queries when data becomes available, allowing your application to handle intermediate loading states.
 
 ## Basic Dependent Query
