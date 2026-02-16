@@ -5,8 +5,6 @@ order: 5
 category: "Guides"
 ---
 
-# Query Options - Reusable Query Configurations
-
 ## Overview
 
 One of the best ways to share `QueryKey` and `QueryFn` between multiple places, yet keep them co-located to one another, is to use **factory methods** that return `QueryOptions<T>`. This pattern allows you to define all possible options for a query in one place with full type safety and reusability.

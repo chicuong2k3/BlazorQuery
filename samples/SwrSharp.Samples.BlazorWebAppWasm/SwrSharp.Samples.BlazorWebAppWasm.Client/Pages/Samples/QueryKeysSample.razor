@@ -50,7 +50,7 @@ else if (_user.IsSuccess)
 
         _user = UseQuery(new QueryOptions<string>(
             queryKey: new QueryKey("user", _userId),
-            queryFn: async _ => { await Task.Delay(300); return $"User #{_userId} loaded at {DateTime.Now:T}"; },
+            queryFn: async ctx => { var id = (int)ctx.QueryKey[1]; await Task.Delay(300); return $"User #{id} loaded at {DateTime.Now:T}"; },
             staleTime: TimeSpan.FromSeconds(10)
         ));
     }

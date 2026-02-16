@@ -42,10 +42,11 @@ else if (_items.IsSuccess)
     {
         _items = UseQuery(new QueryOptions<List<string>>(
             queryKey: new QueryKey("paginated", _page),
-            queryFn: async _ =>
+            queryFn: async ctx =>
             {
+                var page = (int)ctx.QueryKey[1];
                 await Task.Delay(400);
-                var start = (_page - 1) * PageSize + 1;
+                var start = (page - 1) * PageSize + 1;
                 return Enumerable.Range(start, PageSize)
                     .Select(i => $"Item #{i}")
                     .ToList();

@@ -7,6 +7,9 @@ namespace SwrSharp.Blazor;
 /// Base component for Blazor components that use SwrSharp hooks.
 /// Provides UseQuery, UseMutation, and UseInfiniteQuery methods with automatic
 /// StateHasChanged management and disposal.
+/// Override <see cref="OnParametersSet"/> to register hooks. Hooks are re-evaluated
+/// on every render cycle (including state changes), similar to how React re-runs
+/// the component function.
 /// </summary>
 public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
 {
@@ -17,9 +20,18 @@ public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
     private readonly List<Func<Task>> _pendingExecutions = new();
     private bool _disposed;
 
+    protected override bool ShouldRender()
+    {
+        // Blazor does NOT call OnParametersSet on state changes (only on parameter changes
+        // from parent). We call it here so hooks are re-evaluated with current state on
+        // every render cycle — matching React's behavior of re-running hooks each render.
+        OnParametersSet();
+        return true;
+    }
+
     /// <summary>
     /// Creates or retrieves a UseQuery hook. Call this in OnParametersSet.
-    /// The query will auto-execute on first render.
+    /// The query will auto-execute when created with a new key.
     /// </summary>
     protected UseQuery<T> UseQuery<T>(QueryOptions<T> options)
     {
@@ -74,7 +86,7 @@ public abstract class SwrSharpComponentBase : ComponentBase, IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _pendingExecutions.Count > 0 && !_disposed)
+        if (_pendingExecutions.Count > 0 && !_disposed)
         {
             var tasks = _pendingExecutions.Select(execute => execute()).ToArray();
             _pendingExecutions.Clear();

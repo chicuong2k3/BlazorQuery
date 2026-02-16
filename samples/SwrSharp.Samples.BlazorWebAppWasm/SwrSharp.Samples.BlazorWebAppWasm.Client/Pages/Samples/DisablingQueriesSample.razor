@@ -63,10 +63,11 @@ else if (_search.IsSuccess)
 
         _search = UseQuery(new QueryOptions<List<string>>(
             queryKey: new QueryKey("search", _searchTerm),
-            queryFn: async _ =>
+            queryFn: async ctx =>
             {
+                var term = (string)ctx.QueryKey[1];
                 await Task.Delay(300);
-                return Items.Where(i => i.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+                return Items.Where(i => i.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
             },
             enabled: _searchTerm.Length >= 3,
             staleTime: TimeSpan.FromSeconds(30)

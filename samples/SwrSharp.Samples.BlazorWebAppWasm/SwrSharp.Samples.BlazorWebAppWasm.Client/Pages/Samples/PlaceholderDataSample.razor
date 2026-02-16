@@ -63,10 +63,11 @@ else if (_detail.IsPending)
 
         _detail = UseQuery(new QueryOptions<string>(
             queryKey: new QueryKey("item", _selectedId),
-            queryFn: async _ =>
+            queryFn: async ctx =>
             {
+                var id = (string)ctx.QueryKey[1];
                 await Task.Delay(800);
-                return $"Details for Item {_selectedId}: loaded at {DateTime.Now:T}";
+                return $"Details for Item {id}: loaded at {DateTime.Now:T}";
             },
             placeholderDataFunc: (previousData, _) =>
                 previousData != null ? $"[Showing previous: {previousData}]" : null

@@ -5,9 +5,6 @@ order: 4
 category: "Guides"
 ---
 
-
-# Query Retries in SwrSharp
-
 When a query fails (the query function throws an exception), **SwrSharp** can automatically 
 retry the query based on the retry configuration in `QueryOptions<T>`.
 
